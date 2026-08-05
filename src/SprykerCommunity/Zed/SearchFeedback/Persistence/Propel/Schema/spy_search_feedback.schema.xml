@@ -1,0 +1,51 @@
+<?xml version="1.0"?>
+<database xmlns="spryker:schema-01" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" name="zed" namespace="Orm\Zed\SearchFeedback\Persistence" package="src.Orm.Zed.SearchFeedback.Persistence" xsi:schemaLocation="spryker:schema-01 https://static.spryker.com/schema-01.xsd">
+
+    <table name="spy_search_feedback_ticket" idMethod="native" identifierQuoting="true">
+        <column name="id_search_feedback_ticket" type="INTEGER" required="true" autoIncrement="true" primaryKey="true"/>
+        <column name="topic" type="VARCHAR" size="32" required="true" description="SearchFeedbackConfig::TOPIC_*."/>
+        <column name="search_term" type="VARCHAR" size="255" required="true"/>
+        <column name="filters" type="LONGVARCHAR" required="false" description="JSON-encoded active facet/query state at submission time (e.g. category, brand, price range) — including the raw search term param, as reconstructed server-side from the referring SRP request, never trusted as free text from the customer."/>
+        <column name="page_number" type="INTEGER" required="true" defaultValue="1"/>
+        <column name="sku_list" type="LONGVARCHAR" required="false" description="JSON-encoded array of product SKUs actually rendered on the page the ticket was filed against."/>
+        <column name="status" type="VARCHAR" size="16" required="true" defaultValue="open" description="SearchFeedbackConfig::STATUS_*."/>
+        <column name="store_name" type="VARCHAR" size="64" required="true"/>
+        <column name="locale_name" type="VARCHAR" size="16" required="true"/>
+        <column name="customer_reference" type="VARCHAR" size="255" required="true" description="Deliberately not a real FK to spy_customer — loose coupling across the Client/Zed boundary, same convention spy_search_ranking_query_rating.customer_reference uses in search-ranking-optimizer."/>
+
+        <behavior name="timestampable"/>
+        <id-method-parameter value="spy_search_feedback_ticket_pk_seq"/>
+
+        <index name="index-spy_search_feedback_ticket-status">
+            <index-column name="status"/>
+        </index>
+        <index name="index-spy_search_feedback_ticket-customer_reference">
+            <index-column name="customer_reference"/>
+        </index>
+    </table>
+
+    <table name="spy_search_feedback_ticket_message" idMethod="native" identifierQuoting="true">
+        <column name="id_search_feedback_ticket_message" type="INTEGER" required="true" autoIncrement="true" primaryKey="true"/>
+        <column name="fk_search_feedback_ticket" type="INTEGER" required="true"/>
+        <column name="body" type="LONGVARCHAR" required="true"/>
+        <column name="author_type" type="VARCHAR" size="16" required="true" description="SearchFeedbackConfig::AUTHOR_TYPE_* — determines which of the two identity columns below is set."/>
+        <column name="fk_user" type="INTEGER" required="false" description="Set only when author_type=zed_user — the replying Zed admin."/>
+        <column name="customer_reference" type="VARCHAR" size="255" required="false" description="Set only when author_type=customer — same loose-coupling convention as the parent ticket's own customer_reference, not a real FK."/>
+
+        <behavior name="timestampable"/>
+        <id-method-parameter value="spy_search_feedback_ticket_message_pk_seq"/>
+
+        <foreign-key name="spy_search_feedback_ticket_message-fk_ticket" foreignTable="spy_search_feedback_ticket" phpName="SearchFeedbackTicket" refPhpName="SearchFeedbackTicketMessage" onDelete="CASCADE">
+            <reference local="fk_search_feedback_ticket" foreign="id_search_feedback_ticket"/>
+        </foreign-key>
+
+        <foreign-key name="spy_search_feedback_ticket_message-fk_user" foreignTable="spy_user" phpName="User" refPhpName="SearchFeedbackTicketMessage" onDelete="SETNULL">
+            <reference local="fk_user" foreign="id_user"/>
+        </foreign-key>
+
+        <index name="index-spy_search_feedback_ticket_message-fk_ticket">
+            <index-column name="fk_search_feedback_ticket"/>
+        </index>
+    </table>
+
+</database>

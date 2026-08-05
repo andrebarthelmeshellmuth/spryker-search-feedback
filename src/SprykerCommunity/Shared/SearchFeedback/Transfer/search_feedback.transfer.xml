@@ -1,0 +1,76 @@
+<?xml version="1.0"?>
+<transfers xmlns="spryker:transfer-01"
+           xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+           xsi:schemaLocation="spryker:transfer-01 http://static.spryker.com/transfer-01.xsd">
+
+    <!-- Yves -> Zed gateway request: submits one new ticket about the SRP the customer is currently
+         looking at. filters is the raw active-facet query state (e.g. {"category": ["123"], "brand":
+         ["456"]}), skuList is every product SKU actually rendered on that page — both captured server-side
+         from the referring request/view data, not typed by the customer. customerReference is set
+         server-side by the Yves controller from the authenticated session, never trusted from client
+         input. -->
+    <transfer name="SearchFeedbackTicketRequest" strict="true">
+        <property name="topic" type="string"/>
+        <property name="searchTerm" type="string"/>
+        <property name="filters" type="array"/>
+        <property name="pageNumber" type="int"/>
+        <property name="skuList" type="string[]" singular="sku"/>
+        <property name="body" type="string"/>
+        <property name="customerReference" type="string"/>
+        <property name="storeName" type="string"/>
+        <property name="localeName" type="string"/>
+    </transfer>
+
+    <!-- Zed -> Yves gateway response. isSuccess=false covers both an unauthorized caller (re-checked
+         server-side, never trusted from the Yves-side permission check alone) and a validation failure
+         (e.g. empty body). -->
+    <transfer name="SearchFeedbackTicketResponse" strict="true">
+        <property name="isSuccess" type="bool"/>
+        <property name="errorMessage" type="string"/>
+        <property name="ticket" type="SearchFeedbackTicket"/>
+    </transfer>
+
+    <!-- One ticket: the structured SRP context it was filed against, plus the full message thread
+         (messages[0] is always the customer's original submitted body). status is one of
+         SearchFeedbackConfig::STATUS_*. -->
+    <transfer name="SearchFeedbackTicket" strict="true">
+        <property name="idSearchFeedbackTicket" type="int"/>
+        <property name="topic" type="string"/>
+        <property name="searchTerm" type="string"/>
+        <property name="filters" type="array"/>
+        <property name="pageNumber" type="int"/>
+        <property name="skuList" type="string[]" singular="sku"/>
+        <property name="status" type="string"/>
+        <property name="storeName" type="string"/>
+        <property name="localeName" type="string"/>
+        <property name="customerReference" type="string"/>
+        <property name="createdAt" type="string"/>
+        <property name="updatedAt" type="string"/>
+        <property name="messages" type="SearchFeedbackTicketMessage[]" singular="message"/>
+    </transfer>
+
+    <!-- One message in a ticket's thread. authorType is one of SearchFeedbackConfig::AUTHOR_TYPE_* —
+         exactly one of the two identity fields is set to match it: customerReference for
+         AUTHOR_TYPE_CUSTOMER, idUser/authorLabel (the Zed user's username) for AUTHOR_TYPE_ZED_USER. -->
+    <transfer name="SearchFeedbackTicketMessage" strict="true">
+        <property name="idSearchFeedbackTicketMessage" type="int"/>
+        <property name="fkSearchFeedbackTicket" type="int"/>
+        <property name="body" type="string"/>
+        <property name="authorType" type="string"/>
+        <property name="authorLabel" type="string"/>
+        <property name="createdAt" type="string"/>
+    </transfer>
+
+    <!-- Zed-internal request to append a reply to an existing ticket's thread, or to change its status —
+         posted from the Zed Detail controller's Symfony Form, never crosses the Yves/Zed boundary. -->
+    <transfer name="SearchFeedbackTicketMessageRequest" strict="true">
+        <property name="idSearchFeedbackTicket" type="int"/>
+        <property name="body" type="string"/>
+        <property name="idUser" type="int"/>
+    </transfer>
+
+    <transfer name="SearchFeedbackTicketCollection" strict="true">
+        <property name="tickets" type="SearchFeedbackTicket[]" singular="ticket"/>
+    </transfer>
+
+</transfers>

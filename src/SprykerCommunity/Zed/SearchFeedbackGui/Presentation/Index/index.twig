@@ -1,0 +1,12 @@
+{% extends '@Gui/Layout/layout.twig' %}
+
+{% set widget_title = 'Search Feedback Tickets' %}
+{% block section_title %}{{ widget_title | trans }}{% endblock %}
+
+{% block content %}
+    {% embed '@Gui/Partials/widget.twig' with { widget_title: 'List of Tickets' } %}
+        {% block widget_content %}
+            {{ ticketTable | raw }}
+        {% endblock %}
+    {% endembed %}
+{% endblock %}

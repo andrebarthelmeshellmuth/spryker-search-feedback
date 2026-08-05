@@ -1,0 +1,75 @@
+{% extends model('component') %}
+
+{% define config = {
+    name: 'search-feedback-ticket-form',
+} %}
+
+{% define data = {
+    canSubmit: required,
+    searchTerm: '',
+    pageNumber: 1,
+    skuList: [],
+    csrfToken: required,
+    submitUrl: required,
+    topics: [],
+} %}
+
+{# Gated at the include call site too (same belt-and-suspenders posture as
+   search-ranking-optimizer-product-rating), but re-checked here as well since this component can be
+   included directly. #}
+{% if data.canSubmit %}
+    {% block body %}
+        <div class="box spacing-top spacing-top--big">
+            <h3>{{ 'search_feedback.ticket.form.title' | trans }}</h3>
+            <p>{{ 'search_feedback.ticket.form.description' | trans }}</p>
+
+            <form class="{{ config.jsName }}__form" method="POST" action="{{ data.submitUrl }}">
+                <input type="hidden" name="_csrf_token" value="{{ data.csrfToken }}">
+                <input type="hidden" name="searchTerm" value="{{ data.searchTerm }}">
+                <input type="hidden" name="pageNumber" value="{{ data.pageNumber }}">
+                <input type="hidden" name="queryString" value="{{ app.request.queryString }}">
+                {% for sku in data.skuList %}
+                    <input type="hidden" name="skuList[]" value="{{ sku }}">
+                {% endfor %}
+
+                <div class="grid grid--gap">
+                    <div class="col col--sm-12 col--lg-4">
+                        <label for="{{ config.jsName }}__topic">{{ 'search_feedback.ticket.form.topic' | trans }}</label>
+                        {% embed atom('select') with {
+                            modifiers: ['expand'],
+                            attributes: {
+                                name: 'topic',
+                                id: config.jsName ~ '__topic',
+                                required: 'required',
+                            },
+                            embed: {
+                                topics: data.topics,
+                            },
+                        } only %}
+                            {% block options %}
+                                {% for topic in embed.topics %}
+                                    <option value="{{ topic }}">{{ ('search_feedback.ticket.topic.' ~ topic) | trans }}</option>
+                                {% endfor %}
+                            {% endblock %}
+                        {% endembed %}
+                    </div>
+
+                    <div class="col col--sm-12 col--lg-8">
+                        <label for="{{ config.jsName }}__body">{{ 'search_feedback.ticket.form.body' | trans }}</label>
+                        <textarea
+                            id="{{ config.jsName }}__body"
+                            name="body"
+                            class="textarea textarea--expand"
+                            placeholder="{{ 'search_feedback.ticket.form.body.placeholder' | trans }}"
+                            required="required"
+                        ></textarea>
+                    </div>
+                </div>
+
+                <button type="submit" class="button button--primary spacing-top">
+                    {{ 'search_feedback.ticket.form.submit' | trans }}
+                </button>
+            </form>
+        </div>
+    {% endblock %}
+{% endif %}

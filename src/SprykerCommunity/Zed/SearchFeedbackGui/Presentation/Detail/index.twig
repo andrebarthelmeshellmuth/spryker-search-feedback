@@ -1,0 +1,81 @@
+{% extends '@Gui/Layout/layout.twig' %}
+
+{% set widget_title = 'Ticket #%id%: %term%' %}
+{% block section_title %}{{ widget_title | trans({'%id%': ticket.idSearchFeedbackTicket, '%term%': ticket.searchTerm}) }}{% endblock %}
+
+{% block action %}
+    {{ backActionButton('/search-feedback-gui', 'Back to Tickets' | trans) }}
+{% endblock %}
+
+{% block content %}
+    {% embed '@Gui/Partials/widget.twig' with { widget_title: 'Ticket Context' } %}
+        {% block widget_content %}
+            <table class="table">
+                <tbody>
+                    <tr>
+                        <th>Topic</th>
+                        <td>{{ ticket.topic }}</td>
+                    </tr>
+                    <tr>
+                        <th>Search term</th>
+                        <td>{{ ticket.searchTerm }}</td>
+                    </tr>
+                    <tr>
+                        <th>Filters</th>
+                        <td><code>{{ ticket.filters | json_encode }}</code></td>
+                    </tr>
+                    <tr>
+                        <th>Page</th>
+                        <td>{{ ticket.pageNumber }}</td>
+                    </tr>
+                    <tr>
+                        <th>SKUs shown</th>
+                        <td>{{ ticket.skuList | join(', ') }}</td>
+                    </tr>
+                    <tr>
+                        <th>Store / Locale</th>
+                        <td>{{ ticket.storeName }} / {{ ticket.localeName }}</td>
+                    </tr>
+                    <tr>
+                        <th>Status</th>
+                        <td>
+                            {{ ticket.status }}
+                            <div class="btn-group" style="margin-left: 10px;">
+                                {% for status in statuses %}
+                                    {% if status != ticket.status %}
+                                        <a class="btn btn-default btn-sm" href="/search-feedback-gui/detail/change-status?id-search-feedback-ticket={{ ticket.idSearchFeedbackTicket }}&status={{ status }}">
+                                            {{ 'Mark %status%' | trans({'%status%': status}) }}
+                                        </a>
+                                    {% endif %}
+                                {% endfor %}
+                            </div>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th>Filed At</th>
+                        <td>{{ ticket.createdAt }}</td>
+                    </tr>
+                </tbody>
+            </table>
+        {% endblock %}
+    {% endembed %}
+
+    {% embed '@Gui/Partials/widget.twig' with { widget_title: 'Conversation' } %}
+        {% block widget_content %}
+            {% for message in ticket.messages %}
+                <div class="well">
+                    <strong>{{ message.authorType == 'zed_user' ? 'Zed: ' : 'Customer: ' }}{{ message.authorLabel }}</strong>
+                    <span class="text-muted"> — {{ message.createdAt }}</span>
+                    <p style="white-space: pre-wrap;">{{ message.body }}</p>
+                </div>
+            {% endfor %}
+
+            {{ form_start(replyForm) }}
+            {{ form_row(replyForm.body) }}
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">{{ 'Post Reply' | trans }}</button>
+            </div>
+            {{ form_end(replyForm) }}
+        {% endblock %}
+    {% endembed %}
+{% endblock %}

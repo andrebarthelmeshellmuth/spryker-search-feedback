@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<config>
+    <search-feedback-gui>
+        <label>Search Feedback</label>
+        <title>Search Feedback</title>
+        <icon>comments</icon>
+        <bundle>search-feedback-gui</bundle>
+        <controller>index</controller>
+        <action>index</action>
+        <pages>
+            <search-feedback-tickets>
+                <label>Tickets</label>
+                <title>Tickets</title>
+                <bundle>search-feedback-gui</bundle>
+                <controller>index</controller>
+                <action>index</action>
+            </search-feedback-tickets>
+            <search-feedback-ticket-detail>
+                <label>Ticket Detail</label>
+                <title>Ticket Detail</title>
+                <bundle>search-feedback-gui</bundle>
+                <controller>detail</controller>
+                <action>index</action>
+                <visible>0</visible>
+            </search-feedback-ticket-detail>
+        </pages>
+    </search-feedback-gui>
+</config>

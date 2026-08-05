@@ -1,0 +1,22 @@
+<?php
+
+/**
+ * This file is part of the spryker-community/search-feedback package.
+ * For full license information, please view the LICENSE file that was distributed with this source code.
+ */
+
+declare(strict_types = 1);
+
+namespace SprykerCommunity\Client\SearchFeedback\Dependency\Client;
+
+use Spryker\Shared\Kernel\Transfer\TransferInterface;
+
+interface SearchFeedbackToZedRequestInterface
+{
+    /**
+     * @param string $url
+     * @param \Spryker\Shared\Kernel\Transfer\TransferInterface $requestTransfer
+     * @param int|null $timeoutInSeconds
+     */
+    public function call(string $url, TransferInterface $requestTransfer, ?int $timeoutInSeconds = null): TransferInterface;
+}
