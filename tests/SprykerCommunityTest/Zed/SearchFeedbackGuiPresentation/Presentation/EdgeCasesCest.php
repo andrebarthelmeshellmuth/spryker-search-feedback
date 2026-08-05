@@ -36,8 +36,6 @@ class EdgeCasesCest
 
     /**
      * @param \SprykerCommunityTest\Zed\SearchFeedbackGuiPresentation\SearchFeedbackGuiPresentationTester $i
-     *
-     * @return void
      */
     public function _before(SearchFeedbackGuiPresentationTester $i): void
     {
@@ -47,8 +45,6 @@ class EdgeCasesCest
 
     /**
      * @param \SprykerCommunityTest\Zed\SearchFeedbackGuiPresentation\SearchFeedbackGuiPresentationTester $i
-     *
-     * @return void
      */
     public function unknownStatusValueRedirectsBackToTheTicketWithAFriendlyMessage(SearchFeedbackGuiPresentationTester $i): void
     {
@@ -82,8 +78,6 @@ class EdgeCasesCest
 
     /**
      * @param \SprykerCommunityTest\Zed\SearchFeedbackGuiPresentation\SearchFeedbackGuiPresentationTester $i
-     *
-     * @return void
      */
     public function nonexistentTicketIdOnChangeStatusRedirectsToTheListNotACrash(SearchFeedbackGuiPresentationTester $i): void
     {
@@ -101,8 +95,6 @@ class EdgeCasesCest
 
     /**
      * @param \SprykerCommunityTest\Zed\SearchFeedbackGuiPresentation\SearchFeedbackGuiPresentationTester $i
-     *
-     * @return void
      */
     public function nonexistentTicketIdOnDetailPageRedirectsToTheListNotACrash(SearchFeedbackGuiPresentationTester $i): void
     {

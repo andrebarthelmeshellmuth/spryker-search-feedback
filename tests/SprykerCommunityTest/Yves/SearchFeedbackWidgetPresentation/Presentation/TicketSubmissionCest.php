@@ -31,8 +31,6 @@ class TicketSubmissionCest
 {
     /**
      * @param \SprykerCommunityTest\Yves\SearchFeedbackWidgetPresentation\SearchFeedbackWidgetPresentationTester $i
-     *
-     * @return void
      */
     public function _before(SearchFeedbackWidgetPresentationTester $i): void
     {
@@ -42,8 +40,6 @@ class TicketSubmissionCest
 
     /**
      * @param \SprykerCommunityTest\Yves\SearchFeedbackWidgetPresentation\SearchFeedbackWidgetPresentationTester $i
-     *
-     * @return void
      */
     public function submittingTheFormRedirectsBackWithASuccessMessage(SearchFeedbackWidgetPresentationTester $i): void
     {
@@ -63,8 +59,6 @@ class TicketSubmissionCest
 
     /**
      * @param \SprykerCommunityTest\Yves\SearchFeedbackWidgetPresentation\SearchFeedbackWidgetPresentationTester $i
-     *
-     * @return void
      */
     public function blankBodyIsRejectedClientSide(SearchFeedbackWidgetPresentationTester $i): void
     {

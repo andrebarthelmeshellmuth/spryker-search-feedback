@@ -29,8 +29,6 @@ class PermissionGateCest
 {
     /**
      * @param \SprykerCommunityTest\Yves\SearchFeedbackWidgetPresentation\SearchFeedbackWidgetPresentationTester $i
-     *
-     * @return void
      */
     public function _before(SearchFeedbackWidgetPresentationTester $i): void
     {
@@ -39,8 +37,6 @@ class PermissionGateCest
 
     /**
      * @param \SprykerCommunityTest\Yves\SearchFeedbackWidgetPresentation\SearchFeedbackWidgetPresentationTester $i
-     *
-     * @return void
      */
     public function anonymousShopperSeesNoTicketForm(SearchFeedbackWidgetPresentationTester $i): void
     {
@@ -50,8 +46,6 @@ class PermissionGateCest
 
     /**
      * @param \SprykerCommunityTest\Yves\SearchFeedbackWidgetPresentation\SearchFeedbackWidgetPresentationTester $i
-     *
-     * @return void
      */
     public function loggedInCustomerWithoutTheRoleSeesNoTicketForm(SearchFeedbackWidgetPresentationTester $i): void
     {
@@ -62,8 +56,6 @@ class PermissionGateCest
 
     /**
      * @param \SprykerCommunityTest\Yves\SearchFeedbackWidgetPresentation\SearchFeedbackWidgetPresentationTester $i
-     *
-     * @return void
      */
     public function permittedCustomerDoesSeeIt(SearchFeedbackWidgetPresentationTester $i): void
     {

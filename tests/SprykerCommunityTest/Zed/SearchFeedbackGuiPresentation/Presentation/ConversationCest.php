@@ -33,8 +33,6 @@ class ConversationCest
 {
     /**
      * @param \SprykerCommunityTest\Zed\SearchFeedbackGuiPresentation\SearchFeedbackGuiPresentationTester $i
-     *
-     * @return void
      */
     public function _before(SearchFeedbackGuiPresentationTester $i): void
     {
@@ -61,8 +59,6 @@ class ConversationCest
 
     /**
      * @param \SprykerCommunityTest\Zed\SearchFeedbackGuiPresentation\SearchFeedbackGuiPresentationTester $i
-     *
-     * @return void
      */
     public function replyingMovesAnOpenTicketForwardButNeverMovesAnAnsweredOrClosedOne(SearchFeedbackGuiPresentationTester $i): void
     {
@@ -94,8 +90,6 @@ class ConversationCest
 
     /**
      * @param \SprykerCommunityTest\Zed\SearchFeedbackGuiPresentation\SearchFeedbackGuiPresentationTester $i
-     *
-     * @return void
      */
     public function replyBodyContainingMarkupRendersAsLiteralTextNeverExecutes(SearchFeedbackGuiPresentationTester $i): void
     {

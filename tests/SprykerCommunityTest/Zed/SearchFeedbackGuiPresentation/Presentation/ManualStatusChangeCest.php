@@ -31,8 +31,6 @@ class ManualStatusChangeCest
 {
     /**
      * @param \SprykerCommunityTest\Zed\SearchFeedbackGuiPresentation\SearchFeedbackGuiPresentationTester $i
-     *
-     * @return void
      */
     public function _before(SearchFeedbackGuiPresentationTester $i): void
     {
@@ -42,8 +40,6 @@ class ManualStatusChangeCest
 
     /**
      * @param \SprykerCommunityTest\Zed\SearchFeedbackGuiPresentation\SearchFeedbackGuiPresentationTester $i
-     *
-     * @return void
      */
     public function anyStatusCanBeSetManuallyInEitherDirection(SearchFeedbackGuiPresentationTester $i): void
     {

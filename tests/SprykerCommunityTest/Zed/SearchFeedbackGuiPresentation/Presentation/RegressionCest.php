@@ -29,8 +29,6 @@ class RegressionCest
 {
     /**
      * @param \SprykerCommunityTest\Zed\SearchFeedbackGuiPresentation\SearchFeedbackGuiPresentationTester $i
-     *
-     * @return void
      */
     public function plainCatalogSearchStillBehavesNormally(SearchFeedbackGuiPresentationTester $i): void
     {

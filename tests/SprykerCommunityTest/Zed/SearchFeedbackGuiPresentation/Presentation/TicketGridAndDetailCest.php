@@ -31,8 +31,6 @@ class TicketGridAndDetailCest
 {
     /**
      * @param \SprykerCommunityTest\Zed\SearchFeedbackGuiPresentation\SearchFeedbackGuiPresentationTester $i
-     *
-     * @return void
      */
     public function _before(SearchFeedbackGuiPresentationTester $i): void
     {
@@ -42,8 +40,6 @@ class TicketGridAndDetailCest
 
     /**
      * @param \SprykerCommunityTest\Zed\SearchFeedbackGuiPresentation\SearchFeedbackGuiPresentationTester $i
-     *
-     * @return void
      */
     public function detailPageShowsFullTicketContextAndConversation(SearchFeedbackGuiPresentationTester $i): void
     {

@@ -29,8 +29,6 @@ class PreFlightCest
 {
     /**
      * @param \SprykerCommunityTest\Zed\SearchFeedbackGuiPresentation\SearchFeedbackGuiPresentationTester $i
-     *
-     * @return void
      */
     public function _before(SearchFeedbackGuiPresentationTester $i): void
     {
@@ -40,8 +38,6 @@ class PreFlightCest
 
     /**
      * @param \SprykerCommunityTest\Zed\SearchFeedbackGuiPresentation\SearchFeedbackGuiPresentationTester $i
-     *
-     * @return void
      */
     public function navBundleAndGridLoadWithoutError(SearchFeedbackGuiPresentationTester $i): void
     {
