@@ -5,7 +5,7 @@
         <column name="id_search_feedback_ticket" type="INTEGER" required="true" autoIncrement="true" primaryKey="true"/>
         <column name="topic" type="VARCHAR" size="32" required="true" description="SearchFeedbackConfig::TOPIC_*."/>
         <column name="search_term" type="VARCHAR" size="255" required="true"/>
-        <column name="filters" type="LONGVARCHAR" required="false" description="JSON-encoded active facet/query state at submission time (e.g. category, brand, price range) — including the raw search term param, as reconstructed server-side from the referring SRP request, never trusted as free text from the customer."/>
+        <column name="filters" type="LONGVARCHAR" required="false" description="JSON-encoded active facet/query state at submission time (e.g. category, brand, price range). Read from the submitted POST body, not independently re-verified against a live search — see search_feedback.transfer.xml's SearchFeedbackTicketRequest comment for the full trust-boundary note. Not interpreted as markup anywhere it is displayed."/>
         <column name="page_number" type="INTEGER" required="true" defaultValue="1"/>
         <column name="sku_list" type="LONGVARCHAR" required="false" description="JSON-encoded array of product SKUs actually rendered on the page the ticket was filed against."/>
         <column name="status" type="VARCHAR" size="16" required="true" defaultValue="open" description="SearchFeedbackConfig::STATUS_*."/>

@@ -37,6 +37,9 @@ interface SearchFeedbackFacadeInterface
      * @api
      *
      * @param \Generated\Shared\Transfer\SearchFeedbackTicketMessageRequestTransfer $messageRequestTransfer
+     *
+     * @throws \InvalidArgumentException The reply body is blank.
+     * @throws \OutOfBoundsException The referenced ticket does not exist.
      */
     public function replyToTicket(SearchFeedbackTicketMessageRequestTransfer $messageRequestTransfer): SearchFeedbackTicketTransfer;
 
@@ -49,6 +52,9 @@ interface SearchFeedbackFacadeInterface
      *
      * @param int $idSearchFeedbackTicket
      * @param string $status
+     *
+     * @throws \InvalidArgumentException The given status is not one of SearchFeedbackConfig::STATUS_*.
+     * @throws \OutOfBoundsException The referenced ticket does not exist.
      */
     public function changeTicketStatus(int $idSearchFeedbackTicket, string $status): SearchFeedbackTicketTransfer;
 

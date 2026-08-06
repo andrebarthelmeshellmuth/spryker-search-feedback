@@ -1,0 +1,22 @@
+namespace: SprykerCommunityTest\Yves\SearchFeedbackWidget
+
+paths:
+    tests: .
+    data: _data
+    support: _support
+    output: _output
+
+coverage:
+    enabled: true
+    remote: false
+    include:
+        - 'packages/spryker-community/search-feedback/src/*'
+
+suites:
+    Unit:
+        path: .
+        actor: SearchFeedbackWidgetTester
+        modules:
+            enabled:
+                - \PyzTest\Shared\Testify\Helper\Environment
+                - \SprykerTest\Shared\Testify\Helper\ConfigHelper
