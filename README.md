@@ -13,8 +13,9 @@ to read it, or any reply, back from the storefront. Everything past submission h
 - [Why a separate package](#why-a-separate-package)
 - [Status](#status)
 - [What it does](#what-it-does)
-- [Data model](#data-model)
+- [Requirements](#requirements)
 - [Installation](#installation)
+- [Limitations](#limitations)
 - [Testing and CI](#testing-and-ci)
   - [Automated checks](#automated-checks)
   - [Test suite](#test-suite)
@@ -33,7 +34,7 @@ the rendered SRP. Kept standalone so a shop can install it without either of tho
 
 ## Status
 
-Feature-complete for its scope. Verified: 49 Codeception tests (Client, Zed, Zed GUI and Yves layers,
+Feature-complete for its scope. Verified: 67 Codeception tests (Client, Zed, Zed GUI and Yves layers,
 including real-database integration coverage for the full submit → reply → status-change → list/find round
 trip), phpcs clean, and the package's public `SearchFeedbackFacade` at 100% method coverage. See
 [Testing and CI](#testing-and-ci) below for the measured numbers and the (deliberate, documented) gaps.
@@ -56,13 +57,20 @@ full conversation thread + reply form + status actions):
 
 ![The Zed ticket detail page: Ticket Context (topic, search term, filters JSON, page, SKUs shown, store/locale, status with Mark answered/Mark closed actions, filed-at), and Conversation showing the customer's original message and a Zed admin's reply, with a reply form below](docs/screenshots/zed-ticket-detail.png)
 
-## Data model
+## Requirements
 
-- `spy_search_feedback_ticket` — topic, search term, filters (JSON), page number, SKU list (JSON), status,
-  store/locale, and a plain `customer_reference` VARCHAR (deliberately not a real FK to `spy_customer` —
-  same loose-coupling convention `search-ranking-optimizer` uses for its own rating table).
-- `spy_search_feedback_ticket_message` — one row per message in the thread; `author_type` plus exactly one
-  of `fk_user` (a Zed admin) or `customer_reference` (the original submitter) set per row.
+- PHP >= 8.3
+- Spryker (kernel/gui/acl/customer/company-user/store/permission-extension/propel-orm/transfer/user/
+  zed-request — see `composer.json` for floors, verified by `composer check-floors`)
+- **No search engine required.** Unlike the sibling `search-debug`/`search-ranking`/
+  `search-ranking-optimizer` packages, this one never queries Elasticsearch/OpenSearch — a ticket only
+  *records* the query/filters/page/SKUs a customer was looking at, it never re-runs or re-scores that
+  search. Propel/MySQL is the only datastore.
+- **B2B company-user accounts.** `CompanyUserPermissionAuthorizer` resolves "does this customer actually
+  hold `SubmitSearchFeedbackTicketPermissionPlugin`" via their active `CompanyUser`, the same
+  permission-granting mechanism the rest of a B2B shop already uses (same posture as the sibling
+  `search-ranking-optimizer` package's own rating-permission check). A B2C-only shop with no
+  `CompanyUser` module has nothing to grant the permission to.
 
 ## Installation
 
@@ -93,6 +101,90 @@ full conversation thread + reply form + status actions):
    this runs. Same gotcha the sibling `search-ranking-optimizer` package's own Gateway controller has.
 9. In the Zed ACL module, create your "ticket worker" and "feedback admin" groups and grant/deny access to
    `SearchFeedbackGui/Detail/changeStatus` accordingly — this package ships no ACL fixture data.
+10. **Translations.** Two separate mechanisms, one per layer — Zed's `trans` filter does **not** read from
+    the Yves-facing Glossary module, same split as the sibling `search-ranking`/`search-ranking-optimizer`
+    packages:
+    - **Zed GUI** (ticket list/detail, reply form, status labels): ships as
+      `spryker/translator` CSV catalogs under [`data/translation/Zed/`](data/translation/Zed/). If your
+      project already extended `Pyz\Zed\Translator\TranslatorConfig::getCoreTranslationFilePathPatterns()`
+      with the `spryker-community/*` glob for a sibling package, this package is auto-discovered by the
+      same glob — no extra step. Otherwise add it once:
+      ```php
+      $coreTranslationFilePathPatterns[] = APPLICATION_VENDOR_DIR . '/spryker-community/*/data/translation/Zed/[a-z][a-z]_[A-Z][A-Z].csv';
+      ```
+    - **Yves widget** (ticket form + the check-installation page below): a plain
+      [`data/glossary.csv`](data/glossary.csv), imported the normal Spryker way (the same Redis-backed
+      Glossary module every Yves-facing string in a Spryker shop already uses):
+      ```bash
+      vendor/bin/console data:import glossary
+      ```
+11. **Verify the installation.**
+    ```bash
+    vendor/bin/console search-feedback:check-installation
+    ```
+    Most of the steps above fail *silently* when missed — the ticket form simply never appears, or
+    appears but 404s on submit, with nothing in any log to say why. This command checks the core
+    namespace registration, that every plugin class is loadable, and that the ticket table is reachable
+    (a real DB round trip — the fastest way to notice step 7 was skipped). It exits non-zero and names
+    the remedy for whatever is wrong, and explicitly flags the Backend Gateway router cache (step 8) —
+    the single most notorious silent-failure point, since every other Zed page keeps working while ticket
+    submission alone 404s until it's warmed.
+
+    It is explicit about its own blind spots: running in Zed, it never bootstraps the Yves DI container,
+    so it cannot confirm the route/Twig plugins from step 4 or the template include from step 5 — it says
+    so in its output.
+
+    Register it in `src/Pyz/Zed/Console/ConsoleDependencyProvider.php`:
+    ```php
+    use SprykerCommunity\Zed\SearchFeedback\Communication\Console\SearchFeedbackCheckInstallationConsole;
+
+        protected function getConsoleCommands(Container $container): array
+        {
+            return [
+                // ... existing commands
+                new SearchFeedbackCheckInstallationConsole(),
+            ];
+        }
+    ```
+
+    **Yves-side counterpart.** `/search-feedback-widget/check-installation` closes exactly the gap the
+    console command names above — it runs from inside the real Yves DI container (no new plugin
+    registration needed, it uses the same `SearchFeedbackWidgetRouteProviderPlugin` from step 4), and
+    checks the three Twig functions and the submit-ticket route from step 4. It is complementary, not a
+    replacement: it does not re-check the core namespace, plugin class loadability, or the ticket table —
+    run the console command for those.
+
+    Reachable only when BOTH hold:
+    - The route exists at all — governed by
+      `SprykerCommunity\Shared\SearchFeedback\SearchFeedbackConstants::IS_CHECK_INSTALLATION_PAGE_ENABLED`,
+      which **defaults to disabled**, same posture and same rationale as the identical flag on the
+      sibling `search-debug` package. **Enable it in your development-tier config**:
+      ```php
+      $config[SearchFeedbackConstants::IS_CHECK_INSTALLATION_PAGE_ENABLED] = true;
+      ```
+    - The visiting customer holds the `SubmitSearchFeedbackTicketPermissionPlugin` permission — checked
+      wherever the flag above leaves the route enabled. Missing the permission there renders a dedicated
+      explanation with the exact remedy (grant the permission, per step 3) at HTTP 403, rather than a bare
+      access-denied response.
+
+## Limitations
+
+- **No notification when a ticket is answered.** There is no email/mail integration anywhere in this
+  package — a Zed admin's reply lands in the database and nowhere else. Combined with the Yves side being
+  write-only (see above), a customer who filed a ticket has no way to ever learn it was answered unless
+  told through some other channel. Deliberate scope: adding notifications means picking a channel
+  (email? a storefront inbox widget, which would also mean building the read-back path this package
+  intentionally doesn't have?) that's a real product decision, not a default this package should assume.
+- **No per-submitter scoping in Zed.** Any Zed admin with access to the module sees every ticket from
+  every customer — Zed users and Yves customers are separate identity systems with no built-in link, so
+  there's no natural "your tickets" boundary to enforce even if it were wanted. Access control here is
+  role-level (ticket worker vs. feedback admin, via the two separately-restrictable controller actions),
+  not row-level.
+- **One flat conversation thread per ticket, no internal/private notes.** Every message on a ticket —
+  customer or Zed admin — is visible to any Zed admin who can view the ticket. There's no way for one Zed
+  admin to leave a note for another without the customer's original message context, since there's no
+  customer-facing view to accidentally leak an internal note into anyway; the constraint here is purely
+  "everyone with access sees everything," not a security boundary between Zed users.
 
 ## Testing and CI
 
@@ -126,14 +218,14 @@ vendor/bin/codecept run   -c vendor/spryker-community/search-feedback/tests/Spry
 vendor/bin/codecept run   -c vendor/spryker-community/search-feedback/tests/SprykerCommunityTest/Yves/SearchFeedbackWidget
 ```
 
-49 tests, all green, measured with `--coverage --coverage-text` (pcov):
+67 tests, all green:
 
 | layer | tests | notable coverage |
 |---|---|---|
 | Client | 8 | `SearchFeedbackClient`, `SearchFeedbackFactory`, `SearchFeedbackStub`, `SearchFeedbackConfig`, permission plugin — 100% methods |
-| Zed (`SearchFeedback`) | 31 | `SearchFeedbackFacade` 100% (5/5), `TicketManager` 100%, `SearchFeedbackEntityManager`/`Repository`/`Mapper` 100%, `CompanyUserPermissionAuthorizer` 100%, `GatewayController` 100% |
+| Zed (`SearchFeedback`) | 38 | `SearchFeedbackFacade` 100% (5/5), `TicketManager` 100%, `SearchFeedbackEntityManager`/`Repository`/`Mapper` 100%, `CompanyUserPermissionAuthorizer` 100%, `GatewayController` 100%, `SearchFeedbackCheckInstallationConsole` 100% (every check's pass/fail branch, via a mocked Facade + `CommandTester`) |
 | Zed (`SearchFeedbackGui`) | 6 | `ReplyForm` validation (via a real Symfony `FormFactory`), `SearchFeedbackGuiCommunicationFactory` DI wiring |
-| Yves (`SearchFeedbackWidget`) | 4 | `SearchFeedbackWidgetFactory` DI wiring |
+| Yves (`SearchFeedbackWidget`) | 15 | `SearchFeedbackWidgetFactory` DI wiring, `CheckInstallationController` 100% (permission gate, both Twig-function/route check branches, against a hand-built `ContainerInterface` fixture — no real app boot needed) |
 
 The Zed suite's `GatewayControllerTest` and `SearchFeedbackFacadeTest` are real database integration
 tests — no mocked Propel query builder — covering the full submit → reply → status-change →
