@@ -58,11 +58,9 @@ class SearchFeedbackEntityManager extends AbstractEntityManager implements Searc
             $messageEntity->setCustomerReference($requestTransfer->getCustomerReferenceOrFail());
             $messageEntity->save();
 
-            $ticketTransfer = $this->getFactory()
+            return $this->getFactory()
                 ->createSearchFeedbackMapper()
                 ->mapTicketEntityToTransfer($ticketEntity, new SearchFeedbackTicketTransfer(), [$messageEntity]);
-
-            return $ticketTransfer;
         });
     }
 

@@ -14,11 +14,12 @@
     topics: [],
 } %}
 
-{# Gated at the include call site too (same belt-and-suspenders posture as
-   search-ranking-optimizer-product-rating), but re-checked here as well since this component can be
-   included directly. #}
-{% if data.canSubmit %}
-    {% block body %}
+{% block body %}
+    {# Gated at the include call site too (same belt-and-suspenders posture as
+       search-ranking-optimizer-product-rating), but re-checked here as well since this component can be
+       included directly. The `if` has to live INSIDE the block, not wrap it — Twig rejects a block
+       definition nested under a non-capturing node like `if` at the template's top level. #}
+    {% if data.canSubmit %}
         <div class="box spacing-top spacing-top--big">
             <h3>{{ 'search_feedback.ticket.form.title' | trans }}</h3>
             <p>{{ 'search_feedback.ticket.form.description' | trans }}</p>
@@ -71,5 +72,5 @@
                 </button>
             </form>
         </div>
-    {% endblock %}
-{% endif %}
+    {% endif %}
+{% endblock %}

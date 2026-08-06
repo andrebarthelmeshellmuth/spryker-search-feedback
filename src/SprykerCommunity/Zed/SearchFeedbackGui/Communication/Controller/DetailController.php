@@ -10,6 +10,7 @@ declare(strict_types = 1);
 namespace SprykerCommunity\Zed\SearchFeedbackGui\Communication\Controller;
 
 use Generated\Shared\Transfer\SearchFeedbackTicketMessageRequestTransfer;
+use OutOfBoundsException;
 use Spryker\Zed\Kernel\Communication\Controller\AbstractController;
 use SprykerCommunity\Shared\SearchFeedback\SearchFeedbackConfig;
 use SprykerCommunity\Zed\SearchFeedbackGui\Communication\Form\ReplyForm;
@@ -85,6 +86,11 @@ class DetailController extends AbstractController
      * Its own action (not folded into indexAction()) so a "feedback admin" Zed ACL group can be granted
      * this module's view+reply actions while having this one specifically denied — see the package README.
      *
+     * Unlike indexAction(), this action never loads the ticket first — a stale bookmark or a hand-edited
+     * URL can reach here with an id that no longer exists, so changeTicketStatus()'s
+     * `OutOfBoundsException` is a real, reachable case here (not just a defensive check), caught and
+     * turned into the same redirect-with-error-message UX the unknown-status branch above already uses.
+     *
      * @param \Symfony\Component\HttpFoundation\Request $request
      */
     public function changeStatusAction(Request $request): RedirectResponse
@@ -100,7 +106,14 @@ class DetailController extends AbstractController
             return $this->redirectResponse(sprintf('/search-feedback-gui/detail?%s=%d', TicketTable::URL_PARAM_ID_SEARCH_FEEDBACK_TICKET, $idSearchFeedbackTicket));
         }
 
-        $this->getFactory()->getSearchFeedbackFacade()->changeTicketStatus($idSearchFeedbackTicket, $status);
+        try {
+            $this->getFactory()->getSearchFeedbackFacade()->changeTicketStatus($idSearchFeedbackTicket, $status);
+        } catch (OutOfBoundsException) {
+            $this->addErrorMessage(sprintf('Ticket with id %d does not exist.', $idSearchFeedbackTicket));
+
+            return $this->redirectResponse(static::URL_TICKET_LIST);
+        }
+
         $this->addSuccessMessage('Ticket status updated.');
 
         return $this->redirectResponse(sprintf('/search-feedback-gui/detail?%s=%d', TicketTable::URL_PARAM_ID_SEARCH_FEEDBACK_TICKET, $idSearchFeedbackTicket));

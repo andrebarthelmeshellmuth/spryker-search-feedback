@@ -5,10 +5,15 @@
 
     <!-- Yves -> Zed gateway request: submits one new ticket about the SRP the customer is currently
          looking at. filters is the raw active-facet query state (e.g. {"category": ["123"], "brand":
-         ["456"]}), skuList is every product SKU actually rendered on that page — both captured server-side
-         from the referring request/view data, not typed by the customer. customerReference is set
-         server-side by the Yves controller from the authenticated session, never trusted from client
-         input. -->
+         ["456"]}), skuList is every product SKU rendered on that page — both reconstructed from hidden
+         form fields the ticket-form template fills in server-side at RENDER time, but read back from the
+         plain POST body at SUBMIT time (SubmitTicketController::submitAction()), same as searchTerm and
+         pageNumber. None of the four is independently re-verified against a live search — a submitter
+         could edit these fields before posting. That is an accepted trade-off for this package (the data
+         is qualitative "what was this ticket about" context for a human Zed admin to read, always
+         HTML-escaped on display, never fed into an automated system), not a bug — but do not treat these
+         four as attacker-proof. customerReference is the one field that IS trustworthy: set server-side
+         by the Yves controller from the authenticated session, never read from request input. -->
     <transfer name="SearchFeedbackTicketRequest" strict="true">
         <property name="topic" type="string"/>
         <property name="searchTerm" type="string"/>

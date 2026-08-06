@@ -37,18 +37,17 @@
         "rector/rector": "^2.0",
         "spryker/code-sniffer": "^0.17.30"
     },
-    "repositories": [
-        {
-            "type": "vcs",
-            "url": "https://github.com/andrebarthelmeshellmuth/spryker-search-feedback"
-        }
-    ],
     "scripts": {
+        "check-floors": [
+            "@composer update --prefer-lowest --prefer-stable --no-dev --no-interaction",
+            "php tools/floor-check.php"
+        ],
         "rector": "rector process",
         "rector-dry-run": "rector process --dry-run",
         "phpstan": "phpstan analyse -c phpstan.neon src/"
     },
     "scripts-descriptions": {
+        "check-floors": "Verifies the declared dependency floors are real: resolves every constraint to its oldest allowed version (production deps only) and asserts each vendor symbol used in src/ actually exists there.",
         "rector": "Applies Rector's configured rule sets (PHP floor upgrades + level-0 dead-code/code-quality) to src/ and tests/.",
         "rector-dry-run": "Shows what Rector would change without writing anything.",
         "phpstan": "Static analysis at level 8. Must be run from a host shop — needs the shop's generated Generated\\Shared\\Transfer\\* classes and a freshly regenerated Ide/AutoCompletion stub."

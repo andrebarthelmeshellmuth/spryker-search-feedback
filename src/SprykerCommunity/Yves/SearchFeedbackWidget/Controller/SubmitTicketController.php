@@ -125,7 +125,7 @@ class SubmitTicketController extends AbstractController
             ->setSearchTerm((string)$request->request->get(static::PARAM_SEARCH_TERM, ''))
             ->setFilters($redirectParameters)
             ->setPageNumber((int)$request->request->get(static::PARAM_PAGE_NUMBER, 1))
-            ->setSkuList(array_values(array_filter(array_map('strval', $skuList))))
+            ->setSkuList(array_values(array_filter(array_map(static fn (mixed $sku): string => (string)$sku, $skuList))))
             ->setStoreName($this->getFactory()->getStoreClient()->getCurrentStore()->getNameOrFail())
             ->setLocaleName($this->getLocale())
             ->setCustomerReference($customerTransfer->getCustomerReference());
