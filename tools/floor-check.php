@@ -30,12 +30,17 @@ if (!is_file($packageDir . '/vendor/autoload.php')) {
 require $packageDir . '/vendor/autoload.php';
 
 /**
- * Generated at build time by the host project (`transfer:generate`), never shipped in any vendor tree,
- * so their absence here is expected and says nothing about dependency floors.
+ * Generated at build time by the host project — `Generated\` by `transfer:generate`, `Orm\` by
+ * `propel:install`/`propel:model:build` from this package's own shipped schema.xml (merged with the
+ * host's other schemas) — never shipped in any vendor tree, so their absence here is expected and says
+ * nothing about dependency floors.
  *
- * @var string
+ * @var array<string>
  */
-const HOST_GENERATED_PREFIX = 'Generated\\';
+const HOST_GENERATED_PREFIXES = [
+    'Generated\\',
+    'Orm\\',
+];
 
 /**
  * @var string
@@ -68,7 +73,17 @@ foreach (array_keys($usedSymbols) as $symbol) {
         continue;
     }
 
-    if (str_starts_with($symbol, HOST_GENERATED_PREFIX)) {
+    $isHostGenerated = false;
+
+    foreach (HOST_GENERATED_PREFIXES as $hostGeneratedPrefix) {
+        if (str_starts_with($symbol, $hostGeneratedPrefix)) {
+            $isHostGenerated = true;
+
+            break;
+        }
+    }
+
+    if ($isHostGenerated) {
         $hostGenerated++;
 
         continue;
