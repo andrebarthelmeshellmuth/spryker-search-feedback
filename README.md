@@ -50,8 +50,11 @@ trip), phpcs clean, and the package's public `SearchFeedbackFacade` at 100% meth
   to view and reply but not triage. There is no per-submitter row-level scoping — Zed users and Yves
   customers are separate identity systems with no built-in link, so both Zed roles see the same full list.
 
-The ticket grid (List of Tickets, sortable/searchable via DataTables) and a ticket's detail page (context +
+The SRP ticket form (rendered below the product grid, outside the filter form — see step 5), the Zed
+ticket grid (List of Tickets, sortable/searchable via DataTables), and a ticket's detail page (context +
 full conversation thread + reply form + status actions):
+
+![The storefront search results page with a "Not happy with these results?" box below the product grid: a Topic dropdown (Relevance/Missing results/Wrong order/Filters-facets/Other), a free-text body field, and a Send Feedback button](docs/screenshots/yves-ticket-form.png)
 
 ![The Zed ticket grid: ID, topic, search term, a colored status badge (orange Open / green Closed), filed-at timestamp, and a View action per row](docs/screenshots/zed-ticket-list.png)
 
@@ -75,33 +78,99 @@ full conversation thread + reply form + status actions):
 ## Installation
 
 1. `composer require spryker-community/search-feedback`
-2. Register `Pyz\Client\SearchFeedback\SearchFeedbackDependencyProvider`,
+2. Register the `SprykerCommunity` core namespace: add it to `KernelConstants::CORE_NAMESPACES` in
+   `config/Shared/config_default.php`. Spryker's `ClassResolver` only ever looks in the project namespace
+   plus whatever's listed here — miss this and every class in the package fails to resolve, most visibly as
+   `Can not resolve `SearchFeedbackFacade` in Business layer for your module `SearchFeedback`` the moment
+   anything tries to use the facade, even though composer installed the package correctly and every
+   DependencyProvider below is wired up right.
+   ```php
+   $config[KernelConstants::CORE_NAMESPACES] = [
+       // ... existing entries
+       'SprykerCommunity',
+   ];
+   ```
+3. Register `Pyz\Client\SearchFeedback\SearchFeedbackDependencyProvider`,
    `Pyz\Yves\SearchFeedbackWidget\SearchFeedbackWidgetDependencyProvider`,
    `Pyz\Zed\SearchFeedback\SearchFeedbackDependencyProvider`, and
    `Pyz\Zed\SearchFeedbackGui\SearchFeedbackGuiDependencyProvider` as project-level overrides of the
    package's own.
-3. Register `SubmitSearchFeedbackTicketPermissionPlugin` in both the Client and Zed
+4. Register `SubmitSearchFeedbackTicketPermissionPlugin` in both the Client and Zed
    `PermissionDependencyProvider::getPermissionPlugins()`, and grant it to whichever company role should
    see the SRP ticket form (via `company_role_permission.csv` or the Company Role GUI).
-4. Register `SearchFeedbackWidgetRouteProviderPlugin` in the Yves `RouterDependencyProvider` and
+5. Register `SearchFeedbackWidgetRouteProviderPlugin` in the Yves `RouterDependencyProvider` and
    `SearchFeedbackWidgetTwigPlugin` in the Yves `TwigDependencyProvider`.
-5. Include the ticket-form view in your SRP template, gated on `canSubmitSearchFeedbackTicket()`.
+6. Include the ticket-form view in your SRP template, gated on `canSubmitSearchFeedbackTicket()`.
    **It must render OUTSIDE any enclosing `<form>` your SRP template already has** (e.g. the catalog
    page's own filter/sort/pagination form). HTML doesn't allow nested forms — the browser silently drops
    the inner one, and clicking submit posts the OUTER form instead (wrong endpoint, wrong fields, no CSRF
    validation). Confirmed live: this exact breakage, when the include first landed inside that form.
-6. Copy the `<search-feedback-gui>` block from this package's `Communication/navigation.xml` into your
-   project's `config/Zed/navigation.xml`.
-7. Run `console transfer:generate`, `console propel:diff` + `console propel:migrate` (not
-   `propel:sql:insert` — that reapplies the full schema dump), and
-   `console dev:ide-auto-completion:generate`.
-8. Warm up the Zed **BackendGateway** router: `console router:cache:warm-up:backend-gateway`. It's a
-   separate cache from the main Backoffice router's — every other page can work fine while ticket
-   submission alone 404s (`No route found for "POST .../search-feedback/gateway/submit-ticket"`) until
-   this runs. Same gotcha the sibling `search-ranking-optimizer` package's own Gateway controller has.
-9. In the Zed ACL module, create your "ticket worker" and "feedback admin" groups and grant/deny access to
-   `SearchFeedbackGui/Detail/changeStatus` accordingly — this package ships no ACL fixture data.
-10. **Translations.** Two separate mechanisms, one per layer — Zed's `trans` filter does **not** read from
+
+   **Building `submitUrl` under `SPRYKER_DYNAMIC_STORE_MODE=1`.** If your shop runs with dynamic store
+   mode enabled, don't pass `path('search-feedback-widget/submit-ticket')` straight into the molecule's
+   `submitUrl` — route generation fails for any non-default store with `RouteNotFoundException: None of
+   the chained routers were able to generate route: 'search-feedback-widget/submit-ticket' not found`,
+   even though the exact same route matched fine on the way in.
+   `StorePrefixRouterEnhancerPlugin::afterMatch()` only returns matched request *attributes*; it never
+   calls `RequestContext::setParameter('store', ...)`, so generation has no store to work with for any
+   route this package (or any other community package) registers. Build the URL by hand from the current
+   request instead:
+   ```twig
+   {% set requestStore = app.request.attributes.get('store') %}
+   {% set storePrefix = (requestStore is not empty and app.request.getPathInfo() starts with ('/' ~ requestStore ~ '/'))
+       ? ('/' ~ requestStore)
+       : '' %}
+   {% include molecule('search-feedback-ticket-form', 'SearchFeedbackWidget') with {
+       data: {
+           canSubmit: canSubmitSearchFeedbackTicket(),
+           searchTerm: data.searchString,
+           pageNumber: data.pagination.currentPage | default(1),
+           skuList: data.products | default([]) | map((product) => product.abstract_sku),
+           csrfToken: searchFeedbackTicketCsrfToken(),
+           submitUrl: storePrefix ~ '/search-feedback-widget/submit-ticket',
+           topics: getSearchFeedbackTicketTopics(),
+       },
+   } only %}
+   ```
+   Verified against `/DE/...`, `/AT/...`, and no-prefix requests — all resolve to the correct `action` URL.
+   Shops that don't run dynamic store mode can use `path()` directly and skip this.
+7. Copy the `<search-feedback-gui>` block from this package's `Communication/navigation.xml` into your
+   project's `config/Zed/navigation.xml`. If your project already lists every top-level Zed nav group
+   explicitly (rather than relying on Spryker's default full-merge, i.e. `ZedNavigationConfig::
+   getMergeStrategy()` returns `BREADCRUMB_MERGE_STRATEGY`), a brand-new top-level group silently never
+   renders — nest the block as a `<pages>` entry inside an existing top-level group instead (e.g.
+   `merchandising`, next to the sibling `search-preferences` entry). In that case **don't** also copy the
+   package's own `<search-feedback-tickets>`/`<search-feedback-ticket-detail>` children into your root
+   file — leave your root entry childless and let them merge in automatically from the package's own
+   `navigation.xml`. Redeclaring them yourself causes `array_merge_recursive` to collide on the duplicate
+   scalar leaves (same key, same string value) and turn them into arrays, which crashes the page with
+   `Twig\Error\RuntimeError: ... ("Array to string conversion") in "@Gui/Partials/navigation.twig"`.
+   Then run `console navigation:cache:remove` + `console navigation:build-cache` to pick up the change —
+   the Zed nav tree is cached and does not re-read `navigation.xml` on every request.
+8. **Warm the Zed Backoffice router cache**: `console router:cache:warm-up:backoffice`. Zed's nav renderer
+   drops any item whose navigation-XML key isn't found in the *cached* Backoffice route collection
+   (`BackofficeNavigationItemCollectionRouterFilter`) — with a stale cache the "Search Feedback" entry from
+   step 7 is silently missing from the sidebar (no error, no log, it just isn't there) even though the
+   page itself is reachable by typing the URL directly. Easy to miss because every *other* Zed page keeps
+   working; only a newly-added bundle's own nav entry is affected.
+9. Run `console transfer:generate`, `console propel:diff` + `console propel:migrate` (not
+   `propel:sql:insert` — that reapplies the full schema dump), `console propel:model:build`, and
+   `console dev:ide-auto-completion:generate`. `propel:model:build` is easy to skip since neither `diff` nor
+   `migrate` builds PHP classes, only the database schema — missing it surfaces as `Class
+   "Orm\Zed\SearchFeedback\Persistence\SpySearchFeedbackTicketQuery" not found` the first time anything
+   touches the ticket table.
+10. Warm up the Zed **BackendGateway** router: `console router:cache:warm-up:backend-gateway`. It's a
+    separate cache from the Backoffice router's (step 8) — every other page can work fine while ticket
+    submission alone 404s (`No route found for "POST .../search-feedback/gateway/submit-ticket"`) until
+    this runs. Same gotcha the sibling `search-ranking-optimizer` package's own Gateway controller has.
+    Also re-warm the **Yves** router cache — `yves router:cache:warm-up` — since step 5 adds a new Yves
+    route; skipping it renders the SRP with a `RuntimeError: None of the chained routers were able to
+    generate route: Route 'search-feedback-widget/submit-ticket' not found` the moment the ticket-form
+    include tries to build its `submitUrl`. Standard practice for any package that adds a Yves route, not
+    unique to this one, but easy to forget mid-walkthrough since nothing points at it explicitly.
+11. In the Zed ACL module, create your "ticket worker" and "feedback admin" groups and grant/deny access to
+    `SearchFeedbackGui/Detail/changeStatus` accordingly — this package ships no ACL fixture data.
+12. **Translations.** Two separate mechanisms, one per layer — Zed's `trans` filter does **not** read from
     the Yves-facing Glossary module, same split as the sibling `search-ranking`/`search-ranking-optimizer`
     packages:
     - **Zed GUI** (ticket list/detail, reply form, status labels): ships as
@@ -118,20 +187,20 @@ full conversation thread + reply form + status actions):
       ```bash
       vendor/bin/console data:import glossary
       ```
-11. **Verify the installation.**
+13. **Verify the installation.**
     ```bash
     vendor/bin/console search-feedback:check-installation
     ```
     Most of the steps above fail *silently* when missed — the ticket form simply never appears, or
     appears but 404s on submit, with nothing in any log to say why. This command checks the core
     namespace registration, that every plugin class is loadable, and that the ticket table is reachable
-    (a real DB round trip — the fastest way to notice step 7 was skipped). It exits non-zero and names
-    the remedy for whatever is wrong, and explicitly flags the Backend Gateway router cache (step 8) —
+    (a real DB round trip — the fastest way to notice step 9 was skipped). It exits non-zero and names
+    the remedy for whatever is wrong, and explicitly flags the Backend Gateway router cache (step 10) —
     the single most notorious silent-failure point, since every other Zed page keeps working while ticket
     submission alone 404s until it's warmed.
 
     It is explicit about its own blind spots: running in Zed, it never bootstraps the Yves DI container,
-    so it cannot confirm the route/Twig plugins from step 4 or the template include from step 5 — it says
+    so it cannot confirm the route/Twig plugins from step 5 or the template include from step 6 — it says
     so in its output.
 
     Register it in `src/Pyz/Zed/Console/ConsoleDependencyProvider.php`:
@@ -149,8 +218,8 @@ full conversation thread + reply form + status actions):
 
     **Yves-side counterpart.** `/search-feedback-widget/check-installation` closes exactly the gap the
     console command names above — it runs from inside the real Yves DI container (no new plugin
-    registration needed, it uses the same `SearchFeedbackWidgetRouteProviderPlugin` from step 4), and
-    checks the three Twig functions and the submit-ticket route from step 4. It is complementary, not a
+    registration needed, it uses the same `SearchFeedbackWidgetRouteProviderPlugin` from step 5), and
+    checks the three Twig functions and the submit-ticket route from step 5. It is complementary, not a
     replacement: it does not re-check the core namespace, plugin class loadability, or the ticket table —
     run the console command for those.
 
@@ -164,7 +233,7 @@ full conversation thread + reply form + status actions):
       ```
     - The visiting customer holds the `SubmitSearchFeedbackTicketPermissionPlugin` permission — checked
       wherever the flag above leaves the route enabled. Missing the permission there renders a dedicated
-      explanation with the exact remedy (grant the permission, per step 3) at HTTP 403, rather than a bare
+      explanation with the exact remedy (grant the permission, per step 4) at HTTP 403, rather than a bare
       access-denied response.
 
 ## Limitations
