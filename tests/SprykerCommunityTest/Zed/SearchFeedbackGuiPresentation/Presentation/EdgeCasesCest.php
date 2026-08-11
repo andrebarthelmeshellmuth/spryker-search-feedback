@@ -62,7 +62,7 @@ class EdgeCasesCest
         }
 
         $viewHref = $i->grabAttributeFrom(TicketListPage::SELECTOR_VIEW_BUTTON, 'href');
-        preg_match('/' . preg_quote(TicketDetailPage::URL_PARAM_ID, '/') . '=(\d+)/', $viewHref, $matches);
+        preg_match('/' . preg_quote(TicketDetailPage::URL_PARAM_ID, '/') . '=(\d+)/', (string)$viewHref, $matches);
         $idSearchFeedbackTicket = (int)$matches[1];
 
         $i->amOnPage(sprintf(

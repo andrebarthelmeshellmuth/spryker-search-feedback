@@ -13,12 +13,23 @@
             <table class="table">
                 <tbody>
                     <tr>
+                        <th>Customer</th>
+                        <td>{{ customerEmail }}</td>
+                    </tr>
+                    <tr>
                         <th>Topic</th>
                         <td>{{ ticket.topic }}</td>
                     </tr>
                     <tr>
                         <th>Search term</th>
-                        <td>{{ ticket.searchTerm }}</td>
+                        <td>
+                            {{ ticket.searchTerm }}
+                            {% if searchResultsPageUrl %}
+                                <a href="{{ searchResultsPageUrl }}" target="_blank" rel="noopener" class="btn btn-default btn-sm" style="margin-left: 10px;">
+                                    {{ 'View SRP' | trans }}
+                                </a>
+                            {% endif %}
+                        </td>
                     </tr>
                     <tr>
                         <th>Filters</th>

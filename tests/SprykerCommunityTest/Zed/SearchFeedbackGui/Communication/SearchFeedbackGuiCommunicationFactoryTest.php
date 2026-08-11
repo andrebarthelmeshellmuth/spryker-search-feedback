@@ -10,10 +10,14 @@ declare(strict_types = 1);
 namespace SprykerCommunityTest\Zed\SearchFeedbackGui\Communication;
 
 use Codeception\Test\Unit;
+use Generated\Shared\Transfer\StoreTransfer;
 use Spryker\Zed\Kernel\Container;
 use SprykerCommunity\Zed\SearchFeedbackGui\Communication\SearchFeedbackGuiCommunicationFactory;
 use SprykerCommunity\Zed\SearchFeedbackGui\Communication\Table\TicketTable;
+use SprykerCommunity\Zed\SearchFeedbackGui\Dependency\Facade\SearchFeedbackGuiToCustomerFacadeInterface;
+use SprykerCommunity\Zed\SearchFeedbackGui\Dependency\Facade\SearchFeedbackGuiToLocaleFacadeInterface;
 use SprykerCommunity\Zed\SearchFeedbackGui\Dependency\Facade\SearchFeedbackGuiToSearchFeedbackFacadeInterface;
+use SprykerCommunity\Zed\SearchFeedbackGui\Dependency\Facade\SearchFeedbackGuiToStoreFacadeInterface;
 use SprykerCommunity\Zed\SearchFeedbackGui\Dependency\Facade\SearchFeedbackGuiToUserFacadeInterface;
 use SprykerCommunity\Zed\SearchFeedbackGui\SearchFeedbackGuiDependencyProvider;
 
@@ -70,11 +74,77 @@ class SearchFeedbackGuiCommunicationFactoryTest extends Unit
         $this->assertSame($facadeMock, $factory->getUserFacade());
     }
 
+    public function testGetStoreFacadeReturnsTheContainerValue(): void
+    {
+        $facadeMock = $this->createMock(SearchFeedbackGuiToStoreFacadeInterface::class);
+
+        $container = new Container();
+        $container->set(SearchFeedbackGuiDependencyProvider::FACADE_SEARCH_FEEDBACK, $this->createMock(SearchFeedbackGuiToSearchFeedbackFacadeInterface::class));
+        $container->set(SearchFeedbackGuiDependencyProvider::FACADE_USER, $this->createMock(SearchFeedbackGuiToUserFacadeInterface::class));
+        $container->set(SearchFeedbackGuiDependencyProvider::FACADE_STORE, $facadeMock);
+
+        $factory = new SearchFeedbackGuiCommunicationFactory();
+        $factory->setContainer($container);
+
+        $this->assertSame($facadeMock, $factory->getStoreFacade());
+    }
+
+    public function testGetLocaleFacadeReturnsTheContainerValue(): void
+    {
+        $facadeMock = $this->createMock(SearchFeedbackGuiToLocaleFacadeInterface::class);
+
+        $container = new Container();
+        $container->set(SearchFeedbackGuiDependencyProvider::FACADE_SEARCH_FEEDBACK, $this->createMock(SearchFeedbackGuiToSearchFeedbackFacadeInterface::class));
+        $container->set(SearchFeedbackGuiDependencyProvider::FACADE_USER, $this->createMock(SearchFeedbackGuiToUserFacadeInterface::class));
+        $container->set(SearchFeedbackGuiDependencyProvider::FACADE_LOCALE, $facadeMock);
+
+        $factory = new SearchFeedbackGuiCommunicationFactory();
+        $factory->setContainer($container);
+
+        $this->assertSame($facadeMock, $factory->getLocaleFacade());
+    }
+
+    public function testGetAllStoreNamesReturnsTheNameOfEveryStore(): void
+    {
+        $storeFacadeMock = $this->createMock(SearchFeedbackGuiToStoreFacadeInterface::class);
+        $storeFacadeMock->method('getAllStores')->willReturn([
+            (new StoreTransfer())->setName('DE'),
+            (new StoreTransfer())->setName('AT'),
+        ]);
+
+        $container = new Container();
+        $container->set(SearchFeedbackGuiDependencyProvider::FACADE_SEARCH_FEEDBACK, $this->createMock(SearchFeedbackGuiToSearchFeedbackFacadeInterface::class));
+        $container->set(SearchFeedbackGuiDependencyProvider::FACADE_USER, $this->createMock(SearchFeedbackGuiToUserFacadeInterface::class));
+        $container->set(SearchFeedbackGuiDependencyProvider::FACADE_STORE, $storeFacadeMock);
+
+        $factory = new SearchFeedbackGuiCommunicationFactory();
+        $factory->setContainer($container);
+
+        $this->assertSame(['DE', 'AT'], $factory->getAllStoreNames());
+    }
+
+    public function testGetAllLocaleNamesReturnsEveryAvailableLocaleName(): void
+    {
+        $localeFacadeMock = $this->createMock(SearchFeedbackGuiToLocaleFacadeInterface::class);
+        $localeFacadeMock->method('getAvailableLocales')->willReturn([1 => 'de_DE', 2 => 'en_US']);
+
+        $container = new Container();
+        $container->set(SearchFeedbackGuiDependencyProvider::FACADE_SEARCH_FEEDBACK, $this->createMock(SearchFeedbackGuiToSearchFeedbackFacadeInterface::class));
+        $container->set(SearchFeedbackGuiDependencyProvider::FACADE_USER, $this->createMock(SearchFeedbackGuiToUserFacadeInterface::class));
+        $container->set(SearchFeedbackGuiDependencyProvider::FACADE_LOCALE, $localeFacadeMock);
+
+        $factory = new SearchFeedbackGuiCommunicationFactory();
+        $factory->setContainer($container);
+
+        $this->assertSame(['de_DE', 'en_US'], $factory->getAllLocaleNames());
+    }
+
     protected function createFactory(): SearchFeedbackGuiCommunicationFactory
     {
         $container = new Container();
         $container->set(SearchFeedbackGuiDependencyProvider::FACADE_SEARCH_FEEDBACK, $this->createMock(SearchFeedbackGuiToSearchFeedbackFacadeInterface::class));
         $container->set(SearchFeedbackGuiDependencyProvider::FACADE_USER, $this->createMock(SearchFeedbackGuiToUserFacadeInterface::class));
+        $container->set(SearchFeedbackGuiDependencyProvider::FACADE_CUSTOMER, $this->createMock(SearchFeedbackGuiToCustomerFacadeInterface::class));
 
         $factory = new SearchFeedbackGuiCommunicationFactory();
         $factory->setContainer($container);

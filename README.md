@@ -34,10 +34,11 @@ the rendered SRP. Kept standalone so a shop can install it without either of tho
 
 ## Status
 
-Feature-complete for its scope. Verified: 67 Codeception tests (Client, Zed, Zed GUI and Yves layers,
-including real-database integration coverage for the full submit → reply → status-change → list/find round
-trip), phpcs clean, and the package's public `SearchFeedbackFacade` at 100% method coverage. See
-[Testing and CI](#testing-and-ci) below for the measured numbers and the (deliberate, documented) gaps.
+Feature-complete for its scope. Verified: 102 Codeception tests (Client, Zed, Zed GUI and Yves layers plus
+both browser Presentation suites, including real-database integration coverage for the full submit → reply
+→ status-change → list/find round trip), phpcs clean, and the package's public `SearchFeedbackFacade` at
+100% method coverage. See [Testing and CI](#testing-and-ci) below for the measured numbers and the
+(deliberate, documented) gaps.
 
 ## What it does
 
@@ -49,6 +50,10 @@ trip), phpcs clean, and the package's public `SearchFeedbackFacade` at 100% meth
   it can be independently restricted to a "ticket worker" ACL group, leaving a "feedback admin" group able
   to view and reply but not triage. There is no per-submitter row-level scoping — Zed users and Yves
   customers are separate identity systems with no built-in link, so both Zed roles see the same full list.
+  The grid has an optional Store/Locale filter (two dropdowns, "all" by default — this is a cross-scope
+  triage view, not a per-market page); the ticket detail page shows the customer's email (resolved from
+  their customer reference, cached per page load) instead of the raw reference, and a "View search results"
+  link that reconstructs the exact SRP the ticket was filed from, in either dynamic-store-mode configuration.
 
 The SRP ticket form (rendered below the product grid, outside the filter form — see step 5), the Zed
 ticket grid (List of Tickets, sortable/searchable via DataTables), and a ticket's detail page (context +
@@ -287,13 +292,13 @@ vendor/bin/codecept run   -c vendor/spryker-community/search-feedback/tests/Spry
 vendor/bin/codecept run   -c vendor/spryker-community/search-feedback/tests/SprykerCommunityTest/Yves/SearchFeedbackWidget
 ```
 
-67 tests, all green:
+87 tests in this table, plus 15 more in the two browser Presentation suites below (102 total), all green:
 
 | layer | tests | notable coverage |
 |---|---|---|
 | Client | 8 | `SearchFeedbackClient`, `SearchFeedbackFactory`, `SearchFeedbackStub`, `SearchFeedbackConfig`, permission plugin — 100% methods |
 | Zed (`SearchFeedback`) | 38 | `SearchFeedbackFacade` 100% (5/5), `TicketManager` 100%, `SearchFeedbackEntityManager`/`Repository`/`Mapper` 100%, `CompanyUserPermissionAuthorizer` 100%, `GatewayController` 100%, `SearchFeedbackCheckInstallationConsole` 100% (every check's pass/fail branch, via a mocked Facade + `CommandTester`) |
-| Zed (`SearchFeedbackGui`) | 6 | `ReplyForm` validation (via a real Symfony `FormFactory`), `SearchFeedbackGuiCommunicationFactory` DI wiring |
+| Zed (`SearchFeedbackGui`) | 25 | `ReplyForm` validation (via a real Symfony `FormFactory`), `SearchFeedbackGuiCommunicationFactory` DI wiring (all 7 `get*()`/`create*()` methods), `TicketTable::configure()`/`resolveCustomerEmail()`, `DetailController::resolveCustomerEmail()`/`buildSearchResultsPageUrl()` (both dynamic-store-mode branches, against this shop's real config), `IndexController::resolveStoreName()`/`resolveLocaleName()` |
 | Yves (`SearchFeedbackWidget`) | 15 | `SearchFeedbackWidgetFactory` DI wiring, `CheckInstallationController` 100% (permission gate, both Twig-function/route check branches, against a hand-built `ContainerInterface` fixture — no real app boot needed) |
 
 The Zed suite's `GatewayControllerTest` and `SearchFeedbackFacadeTest` are real database integration
@@ -315,11 +320,21 @@ testing Communication/Yves-layer classes outside a live HTTP request — not an 
   empirically (`Call to a member function create() on null` under Codeception's `Environment` helper
   alone). The `ReplyForm` type it builds has full, dedicated coverage in `ReplyFormTest` via a real,
   standalone Symfony `FormFactory` instead.
-- **`TicketTable`**. Its `render()`/`fetchData()` resolve the request and Twig environment from the Zed
-  application container the same way `getFormFactory()` does — same limitation, same reason no sibling
-  package (`search-debug`, `search-ranking`, `search-ranking-optimizer`) tests a `Table` class either.
-  Verified manually against a real ticket (see the screenshots above): status badge CSS class mapping and
-  the per-row "View" action link both render correctly.
+- **`TicketTable::render()`/`fetchData()`/`formatStatus()`/`prepareData()`**. These resolve the request and
+  Twig environment from the Zed application container the same way `getFormFactory()` does — same
+  limitation, same reason no sibling package (`search-debug`, `search-ranking`, `search-ranking-optimizer`)
+  tests a `Table` class's full render path either. `configure()` and `resolveCustomerEmail()` (the rest of
+  its real logic — header/sortable/searchable config, the store/locale URL-param baking, the customer-email
+  N+1 lookup and its not-found fallback) have full, dedicated coverage instead, driven directly via
+  Reflection (see `TicketTableTest`). The Twig-dependent remainder is verified live via the Presentation
+  suite's `TicketGridAndDetailCest`/`StoreLocaleFilterCest`: status badge CSS class mapping, the per-row
+  "View" action link, and the Store/Locale filter dropdowns all render and round-trip correctly.
+- **`DetailController::indexAction()`/`IndexController::indexAction()`/`tableAction()`/
+  `changeStatusAction()`**. Same limitation for the same reason — they resolve `createReplyForm()`/
+  `createTicketTable()->render()`/`fetchData()`. Their non-framework-coupled logic
+  (`resolveCustomerEmail()`, `buildSearchResultsPageUrl()`, `resolveStoreName()`, `resolveLocaleName()`) is
+  unit tested directly instead (see `DetailControllerTest`/`IndexControllerTest`); the full action methods
+  are covered end-to-end by the Presentation suite.
 - **`SubmitTicketController`** (Yves). Reaches through `PermissionAwareTrait::can()` (Spryker's global
   `Locator` singleton, no constructor seam to substitute a fake permission client) and the flash-message
   helpers on `AbstractController`, both of which need a bootstrapped Yves Silex app — the exact same
@@ -355,8 +370,10 @@ Two suites, split by layer:
   never moves an Answered/Closed one), manual status changes in either direction (self-contained: restores
   whatever status it found), reply-body escaping (a `<script>`/`&`/`<b>` payload asserted to render as
   literal text, never executes), edge cases (unknown status value, nonexistent ticket id on both the
-  change-status and detail routes — all redirect gracefully, never crash), and a plain-catalog-search
-  regression check confirming a logged-out guest sees none of this package's or its siblings' UI.
+  change-status and detail routes — all redirect gracefully, never crash), the Store/Locale filter
+  dropdowns (selecting a store reloads the grid with the right query string and shows the selection back as
+  `selected`; the default "all" option applies no filter), and a plain-catalog-search regression check
+  confirming a logged-out guest sees none of this package's or its siblings' UI.
 - `tests/SprykerCommunityTest/Yves/SearchFeedbackWidgetPresentation/` — the SRP ticket form: a real
   submission that redirects back with the success flash message, client-side rejection of a blank body,
   and the permission gate (anonymous guest, logged-in customer without the role, and the permitted

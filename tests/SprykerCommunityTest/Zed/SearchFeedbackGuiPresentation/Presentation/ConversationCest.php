@@ -72,7 +72,7 @@ class ConversationCest
 
         $i->amOnPage($detailHref);
         $statusRow = $i->grabTextFrom('//tr[th[text()="Status"]]/td');
-        $wasOpen = str_contains($statusRow, 'open');
+        $wasOpen = str_contains((string)$statusRow, 'open');
 
         $i->fillField('#' . TicketDetailPage::FIELD_REPLY_BODY, 'Automated Presentation-suite reply — checking the status-transition rule.');
         $i->click(TicketDetailPage::POST_REPLY_BUTTON_TEXT);

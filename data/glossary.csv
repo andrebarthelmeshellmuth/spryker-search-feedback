@@ -45,3 +45,5 @@ search_feedback.check_installation.permission_denied_heading,Search Feedback: pe
 search_feedback.check_installation.permission_denied_heading,Search Feedback: Berechtigung erforderlich,de_DE
 search_feedback.check_installation.permission_denied_body,"This installation-check page is only shown to a customer holding the SubmitSearchFeedbackTicketPermissionPlugin permission. Grant it to a Company Role in Zed → Customer → Company Roles, assign that role to your account, then reload this page.",en_US
 search_feedback.check_installation.permission_denied_body,"Diese Installationsprüfung wird nur einem Kunden mit der Berechtigung SubmitSearchFeedbackTicketPermissionPlugin angezeigt. Vergib sie in Zed → Kunde → Unternehmensrollen an eine Rolle, weise sie deinem Konto zu und lade die Seite neu.",de_DE
+permission.name.SubmitSearchFeedbackTicketPermissionPlugin,Submit search feedback tickets,en_US
+permission.name.SubmitSearchFeedbackTicketPermissionPlugin,Suchfeedback-Tickets einreichen,de_DE

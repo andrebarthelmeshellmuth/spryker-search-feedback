@@ -51,6 +51,10 @@ class TicketSubmissionCest
             SearchResultsPage::SELECTOR_BODY_TEXTAREA,
             'Automated Presentation-suite check: stacking chairs rank low for "chair". Contains a literal & and < to double as an escaping smoke check on the Zed side.',
         );
+        // Scrolled up off the very bottom of the viewport first: the Symfony debug toolbar is
+        // fixed-position there and otherwise intercepts the click (ElementClickInterceptedException),
+        // same fix already used by search-ranking-optimizer's own Presentation Cests.
+        $i->scrollTo("//button[contains(., '" . SearchResultsPage::SUBMIT_BUTTON_TEXT . "')]", 0, -150);
         $i->click(SearchResultsPage::SUBMIT_BUTTON_TEXT);
 
         $i->seeInCurrentUrl('/en/search');
@@ -65,6 +69,7 @@ class TicketSubmissionCest
         $i->amOnPage(SearchResultsPage::URL_CHAIR);
         $i->waitForElementVisible(SearchResultsPage::SELECTOR_FORM, 10);
 
+        $i->scrollTo("//button[contains(., '" . SearchResultsPage::SUBMIT_BUTTON_TEXT . "')]", 0, -150);
         $i->click(SearchResultsPage::SUBMIT_BUTTON_TEXT);
 
         // The browser's native `required` validation blocks the submit - never leaves this page, and
