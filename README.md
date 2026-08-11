@@ -34,7 +34,7 @@ the rendered SRP. Kept standalone so a shop can install it without either of tho
 
 ## Status
 
-Feature-complete for its scope. Verified: 102 Codeception tests (Client, Zed, Zed GUI and Yves layers plus
+Feature-complete for its scope. Verified: 104 Codeception tests (Client, Zed, Zed GUI and Yves layers plus
 both browser Presentation suites, including real-database integration coverage for the full submit → reply
 → status-change → list/find round trip), phpcs clean, and the package's public `SearchFeedbackFacade` at
 100% method coverage. See [Testing and CI](#testing-and-ci) below for the measured numbers and the
@@ -292,7 +292,7 @@ vendor/bin/codecept run   -c vendor/spryker-community/search-feedback/tests/Spry
 vendor/bin/codecept run   -c vendor/spryker-community/search-feedback/tests/SprykerCommunityTest/Yves/SearchFeedbackWidget
 ```
 
-87 tests in this table, plus 15 more in the two browser Presentation suites below (102 total), all green:
+86 tests in this table, plus 18 more in the two browser Presentation suites below (104 total), all green:
 
 | layer | tests | notable coverage |
 |---|---|---|
