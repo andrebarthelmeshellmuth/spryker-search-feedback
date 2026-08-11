@@ -10,6 +10,7 @@ declare(strict_types = 1);
 namespace SprykerCommunity\Zed\SearchFeedbackGui\Communication\Controller;
 
 use Generated\Shared\Transfer\SearchFeedbackTicketMessageRequestTransfer;
+use Generated\Shared\Transfer\SearchFeedbackTicketTransfer;
 use OutOfBoundsException;
 use Spryker\Zed\Kernel\Communication\Controller\AbstractController;
 use SprykerCommunity\Shared\SearchFeedback\SearchFeedbackConfig;
@@ -75,11 +76,95 @@ class DetailController extends AbstractController
             return $this->redirectResponse(sprintf('/search-feedback-gui/detail?%s=%d', TicketTable::URL_PARAM_ID_SEARCH_FEEDBACK_TICKET, $idSearchFeedbackTicket));
         }
 
+        // Deliberately resolved only on this path, not before the reply-submitted check above: a
+        // successful reply redirects immediately and never renders this, so resolving it earlier would
+        // mean paying for a findCustomerByReference() call per customer message in the thread on every
+        // single successful reply, for a result that's thrown away.
+        $customerEmailsByReference = [];
+        $customerEmail = $this->resolveCustomerEmail($ticketTransfer->getCustomerReferenceOrFail(), $customerEmailsByReference);
+
+        // One customer per ticket in practice (only the filer or a Zed user ever reply), but resolved
+        // per message rather than assumed, so this stays correct even if that ever changes.
+        foreach ($ticketTransfer->getMessages() as $messageTransfer) {
+            if ($messageTransfer->getAuthorTypeOrFail() !== SearchFeedbackConfig::AUTHOR_TYPE_CUSTOMER) {
+                continue;
+            }
+
+            $messageTransfer->setAuthorLabel(
+                $this->resolveCustomerEmail($messageTransfer->getAuthorLabelOrFail(), $customerEmailsByReference),
+            );
+        }
+
         return $this->viewResponse([
             'ticket' => $ticketTransfer,
+            'customerEmail' => $customerEmail,
             'replyForm' => $replyForm->createView(),
             'statuses' => (new SearchFeedbackConfig())->getStatuses(),
+            'searchResultsPageUrl' => $this->buildSearchResultsPageUrl($ticketTransfer),
         ]);
+    }
+
+    /**
+     * `spryker/customer` exposes no batch/collection lookup by multiple references, so this caches by
+     * reference across the ticket's own messages instead of calling out per message.
+     *
+     * @param string $customerReference
+     * @param array<string, string> $customerEmailsByReference
+     */
+    protected function resolveCustomerEmail(string $customerReference, array &$customerEmailsByReference): string
+    {
+        if (!isset($customerEmailsByReference[$customerReference])) {
+            $customerResponseTransfer = $this->getFactory()->getCustomerFacade()->findCustomerByReference($customerReference);
+
+            $customerEmailsByReference[$customerReference] = $customerResponseTransfer->getIsSuccess() && $customerResponseTransfer->getCustomerTransfer() !== null
+                ? ($customerResponseTransfer->getCustomerTransfer()->getEmail() ?? $customerReference)
+                : $customerReference;
+        }
+
+        return $customerEmailsByReference[$customerReference];
+    }
+
+    /**
+     * The ticket already carries everything needed to reconstruct the exact SRP it was filed from
+     * (`filters` is the real query string already parsed into an array — see
+     * `SubmitTicketController::buildRedirectParameters()` in the Yves widget) — the only missing piece is
+     * a Zed-side Yves host, since Zed has no host of its own to build a Yves link from.
+     *
+     * Branches on dynamic store mode the same way core's own
+     * `Spryker\Zed\AvailabilityNotification\Business\Strategy\StoreYvesBaseUrlGetStrategy` does: a shop
+     * with it OFF has one Yves host per store and no store segment in the URL; a shop with it ON shares
+     * one Yves host across every store and carries the store as a URL path segment instead
+     * (`StorePrefixRouterEnhancerPlugin`). Returns null (no link rendered) only in the OFF case when the
+     * shop hasn't configured a host for the ticket's store — the ON case always has a base URL.
+     *
+     * @param \Generated\Shared\Transfer\SearchFeedbackTicketTransfer $ticketTransfer
+     */
+    protected function buildSearchResultsPageUrl(SearchFeedbackTicketTransfer $ticketTransfer): ?string
+    {
+        $config = $this->getFactory()->getConfig();
+        $languageCode = explode('_', $ticketTransfer->getLocaleNameOrFail())[0];
+
+        if ($this->getFactory()->getStoreFacade()->isDynamicStoreEnabled()) {
+            $yvesHost = $config->getBaseUrlYves();
+            $pathPrefix = sprintf('/%s/%s', $ticketTransfer->getStoreNameOrFail(), $languageCode);
+        } else {
+            $yvesHost = $config->getStoreToYvesHostMapping()[$ticketTransfer->getStoreNameOrFail()] ?? null;
+            $pathPrefix = '/' . $languageCode;
+        }
+
+        if (!$yvesHost) {
+            return null;
+        }
+
+        $queryString = http_build_query($ticketTransfer->getFilters() ?? []);
+
+        return sprintf(
+            '%s%s%s%s',
+            rtrim($yvesHost, '/'),
+            $pathPrefix,
+            $config->getSearchPath(),
+            $queryString !== '' ? '?' . $queryString : '',
+        );
     }
 
     /**

@@ -149,7 +149,7 @@ class SubmitTicketController extends AbstractController
      *
      * @param \Symfony\Component\HttpFoundation\Request $request
      *
-     * @return array<string, mixed>
+     * @return array<array-key, mixed>
      */
     protected function buildRedirectParameters(Request $request): array
     {

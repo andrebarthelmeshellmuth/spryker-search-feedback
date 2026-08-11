@@ -6,6 +6,30 @@
 {% block content %}
     {% embed '@Gui/Partials/widget.twig' with { widget_title: 'List of Tickets' } %}
         {% block widget_content %}
+            <form method="get" class="form-inline" style="margin-bottom: 15px;">
+                <label for="storeName">{{ 'Store' | trans }}</label>
+                <select name="storeName" id="storeName" class="form-control" onchange="this.form.submit()">
+                    <option value="" {% if selectedStoreName is null %}selected="selected"{% endif %}>
+                        {{ 'All stores' | trans }}
+                    </option>
+                    {% for store in stores %}
+                        <option value="{{ store }}" {% if store == selectedStoreName %}selected="selected"{% endif %}>
+                            {{ store }}
+                        </option>
+                    {% endfor %}
+                </select>
+                <label for="localeName" style="margin-left: 10px;">{{ 'Locale' | trans }}</label>
+                <select name="localeName" id="localeName" class="form-control" onchange="this.form.submit()">
+                    <option value="" {% if selectedLocaleName is null %}selected="selected"{% endif %}>
+                        {{ 'All locales' | trans }}
+                    </option>
+                    {% for locale in locales %}
+                        <option value="{{ locale }}" {% if locale == selectedLocaleName %}selected="selected"{% endif %}>
+                            {{ locale }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </form>
             {{ ticketTable | raw }}
         {% endblock %}
     {% endembed %}

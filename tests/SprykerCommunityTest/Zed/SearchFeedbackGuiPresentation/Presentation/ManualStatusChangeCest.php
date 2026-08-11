@@ -68,11 +68,11 @@ class ManualStatusChangeCest
         $i->assertStringContainsString('open', $i->grabTextFrom('//tr[th[text()="Status"]]/td'));
 
         // Round-trip: restore whatever the ticket's real status was before this test touched it.
-        if (str_contains($originalStatusRow, 'open')) {
+        if (str_contains((string)$originalStatusRow, 'open')) {
             return;
         }
 
-        $originalStatus = str_contains($originalStatusRow, 'answered') ? 'answered' : 'closed';
+        $originalStatus = str_contains((string)$originalStatusRow, 'answered') ? 'answered' : 'closed';
         $i->click(TicketDetailPage::markStatusLinkXpath($originalStatus));
         $i->see(TicketDetailPage::FLASH_MESSAGE_STATUS_UPDATED);
     }
