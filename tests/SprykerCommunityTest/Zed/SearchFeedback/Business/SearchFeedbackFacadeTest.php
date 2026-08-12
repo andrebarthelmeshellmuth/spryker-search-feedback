@@ -12,8 +12,6 @@ namespace SprykerCommunityTest\Zed\SearchFeedback\Business;
 use Codeception\Test\Unit;
 use Generated\Shared\Transfer\SearchFeedbackTicketMessageRequestTransfer;
 use Generated\Shared\Transfer\SearchFeedbackTicketRequestTransfer;
-use Orm\Zed\SearchFeedback\Persistence\SpySearchFeedbackTicket;
-use Orm\Zed\SearchFeedback\Persistence\SpySearchFeedbackTicketQuery;
 use SprykerCommunity\Shared\SearchFeedback\SearchFeedbackConfig;
 use SprykerCommunity\Zed\SearchFeedback\Business\SearchFeedbackFacade;
 
@@ -36,25 +34,10 @@ use SprykerCommunity\Zed\SearchFeedback\Business\SearchFeedbackFacade;
  */
 class SearchFeedbackFacadeTest extends Unit
 {
-    /**
-     * @var array<\Orm\Zed\SearchFeedback\Persistence\SpySearchFeedbackTicket>
-     */
-    protected array $ticketEntities = [];
-
-    protected function _after(): void
-    {
-        foreach ($this->ticketEntities as $ticketEntity) {
-            $ticketEntity->delete();
-        }
-
-        parent::_after();
-    }
-
     public function testSubmitTicketPersistsARealTicketAndReturnsItOnTheResponse(): void
     {
         // Act
         $responseTransfer = (new SearchFeedbackFacade())->submitTicket($this->createRequestTransfer());
-        $this->trackForCleanup($responseTransfer->getTicketOrFail()->getIdSearchFeedbackTicketOrFail());
 
         // Assert
         $this->assertTrue($responseTransfer->getIsSuccess());
@@ -67,7 +50,6 @@ class SearchFeedbackFacadeTest extends Unit
         $facade = new SearchFeedbackFacade();
         $submitResponseTransfer = $facade->submitTicket($this->createRequestTransfer());
         $idSearchFeedbackTicket = $submitResponseTransfer->getTicketOrFail()->getIdSearchFeedbackTicketOrFail();
-        $this->trackForCleanup($idSearchFeedbackTicket);
 
         $messageRequestTransfer = (new SearchFeedbackTicketMessageRequestTransfer())
             ->setIdSearchFeedbackTicket($idSearchFeedbackTicket)
@@ -89,7 +71,6 @@ class SearchFeedbackFacadeTest extends Unit
         $facade = new SearchFeedbackFacade();
         $submitResponseTransfer = $facade->submitTicket($this->createRequestTransfer());
         $idSearchFeedbackTicket = $submitResponseTransfer->getTicketOrFail()->getIdSearchFeedbackTicketOrFail();
-        $this->trackForCleanup($idSearchFeedbackTicket);
 
         // Act
         $ticketTransfer = $facade->changeTicketStatus($idSearchFeedbackTicket, SearchFeedbackConfig::STATUS_CLOSED);
@@ -104,7 +85,6 @@ class SearchFeedbackFacadeTest extends Unit
         $facade = new SearchFeedbackFacade();
         $submitResponseTransfer = $facade->submitTicket($this->createRequestTransfer());
         $idSearchFeedbackTicket = $submitResponseTransfer->getTicketOrFail()->getIdSearchFeedbackTicketOrFail();
-        $this->trackForCleanup($idSearchFeedbackTicket);
 
         // Act
         $collectionTransfer = $facade->getTicketCollection();
@@ -134,18 +114,5 @@ class SearchFeedbackFacadeTest extends Unit
             ->setCustomerReference('CUST-FACADE-TEST')
             ->setStoreName('DE')
             ->setLocaleName('en_US');
-    }
-
-    protected function trackForCleanup(int $idSearchFeedbackTicket): void
-    {
-        $ticketEntity = SpySearchFeedbackTicketQuery::create()
-            ->filterByIdSearchFeedbackTicket($idSearchFeedbackTicket)
-            ->findOne();
-
-        if (!($ticketEntity instanceof SpySearchFeedbackTicket)) {
-            return;
-        }
-
-        $this->ticketEntities[] = $ticketEntity;
     }
 }

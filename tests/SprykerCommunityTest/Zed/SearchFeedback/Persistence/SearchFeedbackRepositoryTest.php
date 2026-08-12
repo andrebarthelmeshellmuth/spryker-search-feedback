@@ -28,20 +28,6 @@ use SprykerCommunity\Zed\SearchFeedback\Persistence\SearchFeedbackRepository;
  */
 class SearchFeedbackRepositoryTest extends Unit
 {
-    /**
-     * @var array<\Orm\Zed\SearchFeedback\Persistence\SpySearchFeedbackTicket>
-     */
-    protected array $ticketEntities = [];
-
-    protected function _after(): void
-    {
-        foreach ($this->ticketEntities as $ticketEntity) {
-            $ticketEntity->delete();
-        }
-
-        parent::_after();
-    }
-
     public function testGetTicketCollectionReturnsEveryTicketNewestFirst(): void
     {
         // Arrange
@@ -119,8 +105,6 @@ class SearchFeedbackRepositoryTest extends Unit
         $ticketEntity->setLocaleName('en_US');
         $ticketEntity->setCustomerReference('CUST-REPO-TEST');
         $ticketEntity->save();
-
-        $this->ticketEntities[] = $ticketEntity;
 
         return $ticketEntity;
     }
