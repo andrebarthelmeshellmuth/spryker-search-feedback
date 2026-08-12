@@ -38,7 +38,7 @@ use SprykerCommunity\Zed\SearchFeedbackGui\SearchFeedbackGuiDependencyProvider;
  * @group SearchFeedbackGui
  * @group Communication
  * @group SearchFeedbackGuiCommunicationFactoryTest
- * @group Portable
+ * @group NeedsDatabase
  */
 class SearchFeedbackGuiCommunicationFactoryTest extends Unit
 {

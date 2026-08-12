@@ -31,7 +31,7 @@ use SprykerCommunity\Zed\SearchFeedback\Business\SearchFeedbackFacade;
  * @group SearchFeedback
  * @group Business
  * @group SearchFeedbackFacadeTest
- * @group Portable
+ * @group NeedsDatabase
  */
 class SearchFeedbackFacadeTest extends Unit
 {
