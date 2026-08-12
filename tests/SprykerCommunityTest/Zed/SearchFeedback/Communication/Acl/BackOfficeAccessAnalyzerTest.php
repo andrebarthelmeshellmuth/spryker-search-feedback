@@ -31,6 +31,7 @@ use SprykerCommunity\Zed\SearchFeedback\Dependency\Facade\SearchFeedbackToAclFac
  * @group Communication
  * @group Acl
  * @group BackOfficeAccessAnalyzerTest
+ * @group Portable
  */
 class BackOfficeAccessAnalyzerTest extends Unit
 {

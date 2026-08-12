@@ -27,6 +27,7 @@ use SprykerCommunity\Zed\SearchFeedback\Persistence\Propel\Mapper\SearchFeedback
  * @group SearchFeedback
  * @group Persistence
  * @group SearchFeedbackMapperTest
+ * @group NeedsDatabase
  */
 class SearchFeedbackMapperTest extends Unit
 {

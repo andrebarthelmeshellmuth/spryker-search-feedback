@@ -26,6 +26,7 @@ use SprykerCommunity\Client\SearchFeedback\Zed\SearchFeedbackStubInterface;
  * @group Client
  * @group SearchFeedback
  * @group SearchFeedbackFactoryTest
+ * @group Portable
  */
 class SearchFeedbackFactoryTest extends Unit
 {

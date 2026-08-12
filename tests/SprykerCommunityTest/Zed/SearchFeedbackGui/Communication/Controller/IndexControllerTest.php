@@ -27,6 +27,7 @@ use Symfony\Component\HttpFoundation\Request;
  * @group Communication
  * @group Controller
  * @group IndexControllerTest
+ * @group Portable
  */
 class IndexControllerTest extends Unit
 {

@@ -28,6 +28,7 @@ use SprykerCommunity\Zed\SearchFeedback\Persistence\SearchFeedbackEntityManager;
  * @group SearchFeedback
  * @group Persistence
  * @group SearchFeedbackEntityManagerTest
+ * @group NeedsDatabase
  */
 class SearchFeedbackEntityManagerTest extends Unit
 {

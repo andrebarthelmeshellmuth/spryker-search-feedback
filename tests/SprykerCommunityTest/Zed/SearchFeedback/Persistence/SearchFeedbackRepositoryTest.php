@@ -25,6 +25,7 @@ use SprykerCommunity\Zed\SearchFeedback\Persistence\SearchFeedbackRepository;
  * @group SearchFeedback
  * @group Persistence
  * @group SearchFeedbackRepositoryTest
+ * @group NeedsDatabase
  */
 class SearchFeedbackRepositoryTest extends Unit
 {

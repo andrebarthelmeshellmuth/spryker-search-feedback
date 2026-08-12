@@ -45,6 +45,7 @@ use SprykerCommunityTest\Zed\SearchFeedback\SearchFeedbackZedTester;
  * @group GatewayControllerTest
  *
  * @property \SprykerCommunityTest\Zed\SearchFeedback\SearchFeedbackZedTester $tester
+ * @group Portable
  */
 class GatewayControllerTest extends Unit
 {

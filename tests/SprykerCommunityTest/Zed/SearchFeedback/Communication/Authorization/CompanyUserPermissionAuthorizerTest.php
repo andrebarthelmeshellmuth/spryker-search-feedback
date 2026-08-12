@@ -28,6 +28,7 @@ use SprykerCommunity\Zed\SearchFeedback\Dependency\Facade\SearchFeedbackToPermis
  * @group Communication
  * @group Authorization
  * @group CompanyUserPermissionAuthorizerTest
+ * @group Portable
  */
 class CompanyUserPermissionAuthorizerTest extends Unit
 {

@@ -27,6 +27,7 @@ use SprykerCommunity\Client\SearchFeedback\SearchFeedbackFactory;
  * @group Client
  * @group SearchFeedback
  * @group SearchFeedbackClientTest
+ * @group Portable
  */
 class SearchFeedbackClientTest extends Unit
 {
