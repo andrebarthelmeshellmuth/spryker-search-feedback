@@ -34,10 +34,11 @@ use Throwable;
  * Deliberately honest about its own limits, same posture as
  * {@see \SprykerCommunity\Zed\SearchDebug\Communication\Console\SearchDebugCheckInstallationConsole}: it
  * runs in Zed, so it cannot introspect the Yves DI container (steps 4-5) or confirm the ticket-form
- * template renders correctly (step 5's nested-`<form>` gotcha). Also cannot confirm the navigation.xml
- * entry (step 6) or ACL group setup (step 9) — those are Zed-admin-config concerns, not something a class
- * or a DB row can attest to. It CAN, and does, flag the single most notorious silent-failure point this
- * package's own README calls out by name: the Backend Gateway router needs its OWN cache warmed
+ * template renders correctly (step 5's nested-`<form>` gotcha). It cannot judge whether an adopter's ACL
+ * setup is the one they intended either — but it does report whether ANY restricted back-office role can
+ * reach this package's pages at all, which is the part a DB row CAN attest to. It also flags the single
+ * most notorious silent-failure point this package's own README calls out by name: the Backend Gateway
+ * router needs its OWN cache warmed
  * (step 8) — every other Zed page works fine while ticket submission alone 404s until that runs.
  *
  * Complementary counterpart:
@@ -47,6 +48,7 @@ use Throwable;
  * container. It does not re-check anything this command already covers; run both for a full picture.
  *
  * @method \SprykerCommunity\Zed\SearchFeedback\Business\SearchFeedbackFacadeInterface getFacade()
+ * @method \SprykerCommunity\Zed\SearchFeedback\Communication\SearchFeedbackCommunicationFactory getFactory()
  */
 class SearchFeedbackCheckInstallationConsole extends Console
 {
@@ -58,7 +60,7 @@ class SearchFeedbackCheckInstallationConsole extends Console
     /**
      * @var string
      */
-    public const COMMAND_DESCRIPTION = 'Diagnoses a search-feedback installation: core namespace, plugin classes, and ticket-table reachability.';
+    public const COMMAND_DESCRIPTION = 'Diagnoses a search-feedback installation: core namespace, plugin classes, ticket-table reachability, navigation entries, and back-office ACL reachability.';
 
     /**
      * @var string
@@ -127,6 +129,7 @@ class SearchFeedbackCheckInstallationConsole extends Console
         $this->checkPluginClasses($output);
         $this->checkTicketTable($output);
         $this->checkNavigationRegistered($output);
+        $this->checkBackOfficeAccess($output);
         $this->checkZedTranslationCatalogComplete($output);
 
         $output->writeln('');
@@ -147,8 +150,8 @@ class SearchFeedbackCheckInstallationConsole extends Console
         $output->writeln('Not verifiable from Zed — check these separately:');
         $output->writeln('  - Yves plugin registration (route + Twig function providers, step 4) and the ticket-form');
         $output->writeln('    template include (step 5) — run the Yves counterpart below for the first of these.');
-        $output->writeln('  - ACL group setup (step 9) — a Zed-admin-config concern, not something a class or a DB');
-        $output->writeln('    row can attest to. (The navigation.xml entry itself IS checked above.)');
+        $output->writeln('  - whether your ACL setup is the one you intended (step 11) — that SOME role can reach these');
+        $output->writeln('    pages IS checked above; which roles SHOULD is a decision no command can make for you.');
         $output->writeln('  - the Backend Gateway router cache (step 8) — its OWN cache, separate from every other Zed');
         $output->writeln('    page\'s router; run `vendor/bin/console router:cache:warm-up:backend-gateway` if ticket');
         $output->writeln('    submission alone 404s while everything else works.');
@@ -268,6 +271,91 @@ class SearchFeedbackCheckInstallationConsole extends Console
             $sourceLabel,
             implode(', ', $missingPageKeys),
         );
+    }
+
+    /**
+     * Zed access is deny-by-default outside a matching ACL rule, and this package ships no ACL fixture data
+     * (README step 11) — so who can reach its pages is entirely up to the adopter. Two very different
+     * installations land here:
+     *
+     * A default Spryker install needs nothing done: `root_role` carries a total wildcard and every
+     * installer user sits in `root_group`, so the pages work the moment the package is installed. An
+     * installation running real restricted back-office roles is the opposite — those roles reach nothing
+     * here until somebody adds a rule, and the failure is quiet, because
+     * {@see \Spryker\Zed\Acl\Communication\Plugin\Navigation\AclNavigationItemFilterPlugin} filters the
+     * entry out of the sidebar rather than 403ing. To that user the feature is simply absent, which looks
+     * identical to the package never having been installed.
+     *
+     * A WARNING at most, and worded as something to confirm rather than fix: keeping these pages to
+     * root-style admins is a perfectly ordinary choice, and this command cannot know which roles an adopter
+     * MEANT to grant. It only reports the one state worth a second look — restricted roles exist, and not
+     * one of them has a rule for this package's modules.
+     *
+     * @param \Symfony\Component\Console\Output\OutputInterface $output
+     */
+    protected function checkBackOfficeAccess(OutputInterface $output): void
+    {
+        $moduleNames = $this->readOwnNavigationModuleNames();
+
+        if ($moduleNames === []) {
+            $this->warnings[] = 'Could not read this package\'s own navigation.xml, so back-office access could not be checked. Confirm by hand that the Zed roles which should see the Search Feedback pages can actually reach them.';
+
+            return;
+        }
+
+        $diagnosisTransfer = $this->getFactory()->createBackOfficeAccessAnalyzer()->analyze($moduleNames);
+        $restrictedRoleCount = $diagnosisTransfer->getRestrictedRoleCountOrFail();
+
+        if ($restrictedRoleCount === 0) {
+            $output->writeln(sprintf(
+                '<info>✓</info> all %d back-office role(s) have unrestricted access, so this package\'s Zed pages need no ACL rule',
+                $diagnosisTransfer->getUnrestrictedRoleCountOrFail(),
+            ));
+
+            return;
+        }
+
+        $restrictedRoleWithAccessCount = $diagnosisTransfer->getRestrictedRoleWithAccessCountOrFail();
+
+        if ($restrictedRoleWithAccessCount > 0) {
+            $output->writeln(sprintf(
+                '<info>✓</info> %d of %d restricted back-office role(s) have an ACL rule for %s',
+                $restrictedRoleWithAccessCount,
+                $restrictedRoleCount,
+                implode('/', $moduleNames),
+            ));
+
+            return;
+        }
+
+        $this->warnings[] = sprintf(
+            'This project has %d restricted back-office role(s) and none of them has an ACL rule for %s, so only unrestricted (root-style) admins can reach this package\'s Zed pages — for everybody else the sidebar entry is filtered out entirely, which looks the same as the package not being installed. If that is intended, nothing to do. If a restricted role should see Search Feedback, add a rule for it in the Zed ACL Gui (Maintenance > Users & Rights > Roles); README step 11 also covers splitting status changes off from read-only access.',
+            $restrictedRoleCount,
+            implode('/', $moduleNames),
+        );
+    }
+
+    /**
+     * Read from this package's OWN navigation.xml rather than hardcoded, same as the page-key check below,
+     * so a module added by a later version cannot silently fall out of this check.
+     *
+     * @return array<string>
+     */
+    protected function readOwnNavigationModuleNames(): array
+    {
+        $ownNavigationXml = $this->loadXml(__DIR__ . static::OWN_NAVIGATION_XML_RELATIVE_PATH);
+
+        if ($ownNavigationXml === null) {
+            return [];
+        }
+
+        $moduleNames = [];
+
+        foreach ($ownNavigationXml->xpath('//bundle') ?: [] as $bundleElement) {
+            $moduleNames[(string)$bundleElement] = true;
+        }
+
+        return array_keys($moduleNames);
     }
 
     /**

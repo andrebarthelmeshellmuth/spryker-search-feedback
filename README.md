@@ -204,6 +204,15 @@ full conversation thread + reply form + status actions):
     the single most notorious silent-failure point, since every other Zed page keeps working while ticket
     submission alone 404s until it's warmed.
 
+    It also reports whether anybody other than a root-style admin can reach this package's Zed pages. Zed
+    access is deny-by-default outside a matching ACL rule, and a nav entry the current user has no rule for is
+    filtered out of the sidebar entirely rather than 403ing — so on a shop with real restricted back-office
+    roles, "nobody adjusted ACL" looks exactly like "the package was never installed". A default Spryker
+    install needs nothing done here (`root_role` holds a total wildcard), which is why this is a **warning at
+    most, never a failure**, and only when restricted roles exist and not one of them has a rule for this
+    package's module. Restricting these pages to root-style admins is a perfectly ordinary choice; the command
+    cannot know which roles you meant to grant, so it asks you to confirm rather than telling you to fix.
+
     It is explicit about its own blind spots: running in Zed, it never bootstraps the Yves DI container,
     so it cannot confirm the route/Twig plugins from step 5 or the template include from step 6 — it says
     so in its output.
