@@ -10,8 +10,11 @@ declare(strict_types = 1);
 namespace SprykerCommunity\Zed\SearchFeedback\Communication;
 
 use Spryker\Zed\Kernel\Communication\AbstractCommunicationFactory;
+use SprykerCommunity\Zed\SearchFeedback\Communication\Acl\BackOfficeAccessAnalyzer;
+use SprykerCommunity\Zed\SearchFeedback\Communication\Acl\BackOfficeAccessAnalyzerInterface;
 use SprykerCommunity\Zed\SearchFeedback\Communication\Authorization\CompanyUserPermissionAuthorizer;
 use SprykerCommunity\Zed\SearchFeedback\Communication\Authorization\CompanyUserPermissionAuthorizerInterface;
+use SprykerCommunity\Zed\SearchFeedback\Dependency\Facade\SearchFeedbackToAclFacadeInterface;
 use SprykerCommunity\Zed\SearchFeedback\Dependency\Facade\SearchFeedbackToCompanyUserFacadeInterface;
 use SprykerCommunity\Zed\SearchFeedback\Dependency\Facade\SearchFeedbackToPermissionFacadeInterface;
 use SprykerCommunity\Zed\SearchFeedback\SearchFeedbackDependencyProvider;
@@ -26,6 +29,16 @@ class SearchFeedbackCommunicationFactory extends AbstractCommunicationFactory
     public function getPermissionFacade(): SearchFeedbackToPermissionFacadeInterface
     {
         return $this->getProvidedDependency(SearchFeedbackDependencyProvider::FACADE_PERMISSION);
+    }
+
+    public function getAclFacade(): SearchFeedbackToAclFacadeInterface
+    {
+        return $this->getProvidedDependency(SearchFeedbackDependencyProvider::FACADE_ACL);
+    }
+
+    public function createBackOfficeAccessAnalyzer(): BackOfficeAccessAnalyzerInterface
+    {
+        return new BackOfficeAccessAnalyzer($this->getAclFacade());
     }
 
     public function createCompanyUserPermissionAuthorizer(): CompanyUserPermissionAuthorizerInterface
