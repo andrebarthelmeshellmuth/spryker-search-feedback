@@ -282,6 +282,7 @@ full conversation thread + reply form + status actions):
 | `composer check-floors` (PHP 8.3, 8.4) | the declared dependency floors are real |
 | `rector` dry-run (PHP 8.3, 8.4) | no unapplied Rector rule set drifts in |
 | `phpmd` (`phpmd.xml` + `phpmd-public-methods.xml`) | cyclomatic/NPath complexity, method/class length stay reasonable — run as two separate invocations because PHPMD merges every loaded ruleset's `exclude-pattern` into one global file list per run, and only the public-method-count rule should skip Facades/Factories |
+| `phpstan` (PHP 8.3, 8.4) | static analysis, level 8, standalone CI variant — see "Static analysis" below |
 | `portable tests` (PHP 8.3, 8.4) | this package's own `@group Portable` test subset actually passes — see "Test suite" below |
 
 Same `check-floors` rationale as the sibling `search-debug`/`search-ranking` packages: this package's
@@ -378,9 +379,22 @@ testing Communication/Yves-layer classes outside a live HTTP request — not an 
   own request-parsing helper (`buildRedirectParameters()`) and its collaborators (`SearchFeedbackClient`,
   `SearchFeedbackWidgetFactory`) are covered independently.
 
-Static analysis (`phpstan`, level 8, config in [`phpstan.neon`](phpstan.neon)) is likewise run from a host
-shop rather than in CI: it needs the generated `Generated\Shared\Transfer\*` classes and the shop's
-`Ide/AutoCompletion` stub freshly regenerated.
+### Static analysis
+
+Static analysis (`phpstan`, level 8) runs in two variants:
+
+- **`composer phpstan-ci`** (config [`phpstan.ci.neon`](phpstan.ci.neon)) — what CI runs on every push,
+  standalone. Same transfer-generation recipe as the `Portable` test subset above, and treats two
+  categories of class as out of scope rather than faking them: Propel's generated `Orm\Zed\*\Persistence\*`
+  entity/query/map classes (need a real schema + database, via `propel:model:build`) and the aggregated
+  `Generated\{Zed,Yves,Client,Service}\Ide\AutoCompletion` stub (an aggregate across every module in a real
+  project's full dependency graph, via `console dev:ide-auto-completion:generate`). Both gaps are the same
+  shape as the sibling packages' checked-in `PageIndexMap.php` fixture — a single package can't reproduce a
+  project-wide generator's output standalone.
+- **`composer phpstan`** (config [`phpstan.neon`](phpstan.neon)) — the full check, run from a host shop,
+  where those generated classes are real. This is the one that actually type-checks persistence-layer and
+  DI-wiring code against their real generated types, so it stays the authoritative check for adopters even
+  though CI can't run it:
 
 ```bash
 vendor/bin/console dev:ide-auto-completion:generate
