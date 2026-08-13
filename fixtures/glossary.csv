@@ -1,0 +1,49 @@
+key,translation,locale
+search_feedback.ticket.form.title,Not happy with these results?,en_US
+search_feedback.ticket.form.title,Nicht zufrieden mit diesen Ergebnissen?,de_DE
+search_feedback.ticket.form.description,Tell us what's wrong with this search — we'll follow up.,en_US
+search_feedback.ticket.form.description,Sag uns was an dieser Suche nicht stimmt — wir melden uns.,de_DE
+search_feedback.ticket.form.topic,Topic,en_US
+search_feedback.ticket.form.topic,Thema,de_DE
+search_feedback.ticket.form.body,What about this didn't you like? Be specific.,en_US
+search_feedback.ticket.form.body,Was hat dir an diesen Ergebnissen nicht gefallen? Bitte konkret.,de_DE
+search_feedback.ticket.form.body.placeholder,e.g. the top result doesn't match my query at all...,en_US
+search_feedback.ticket.form.body.placeholder,z.B. das oberste Ergebnis passt gar nicht zu meiner Suche...,de_DE
+search_feedback.ticket.form.submit,Send Feedback,en_US
+search_feedback.ticket.form.submit,Feedback senden,de_DE
+search_feedback.ticket.topic.relevance,Relevance,en_US
+search_feedback.ticket.topic.relevance,Relevanz,de_DE
+search_feedback.ticket.topic.missing_results,Missing results,en_US
+search_feedback.ticket.topic.missing_results,Fehlende Ergebnisse,de_DE
+search_feedback.ticket.topic.wrong_order,Wrong order,en_US
+search_feedback.ticket.topic.wrong_order,Falsche Reihenfolge,de_DE
+search_feedback.ticket.topic.facets,Filters/facets,en_US
+search_feedback.ticket.topic.facets,Filter/Facetten,de_DE
+search_feedback.ticket.topic.other,Other,en_US
+search_feedback.ticket.topic.other,Sonstiges,de_DE
+search_feedback.ticket.success,Thanks — your feedback ticket was submitted.,en_US
+search_feedback.ticket.success,Danke — dein Feedback-Ticket wurde übermittelt.,de_DE
+search_feedback.ticket.error.csrf,"Something went wrong, please try again.",en_US
+search_feedback.ticket.error.csrf,"Etwas ist schiefgelaufen, bitte versuche es erneut.",de_DE
+search_feedback.ticket.error.not_authorized,You are not authorized to submit search feedback.,en_US
+search_feedback.ticket.error.not_authorized,"Du bist nicht berechtigt, Suchfeedback zu senden.",de_DE
+search_feedback.ticket.error.not_logged_in,Please log in to submit search feedback.,en_US
+search_feedback.ticket.error.not_logged_in,"Bitte melde dich an, um Suchfeedback zu senden.",de_DE
+search_feedback.check_installation.heading,Search Feedback: installation check,en_US
+search_feedback.check_installation.heading,Search Feedback: Installationsprüfung,de_DE
+search_feedback.check_installation.scope_hint,"Checks the parts of the installation only visible from the storefront (Yves) DI container.",en_US
+search_feedback.check_installation.scope_hint,"Prüft die Teile der Installation, die nur aus dem Storefront-(Yves)-Container sichtbar sind.",de_DE
+search_feedback.check_installation.not_verifiable_heading,Not verifiable from this page:,en_US
+search_feedback.check_installation.not_verifiable_heading,Von dieser Seite aus nicht prüfbar:,de_DE
+search_feedback.check_installation.not_verifiable_navigation,"Whether your project's config/Zed/navigation.xml includes the search-feedback-gui entry — check Zed's navigation directly to confirm.",en_US
+search_feedback.check_installation.not_verifiable_navigation,"Ob config/Zed/navigation.xml deines Projekts den Eintrag search-feedback-gui enthält — prüfe die Zed-Navigation direkt, um das zu bestätigen.",de_DE
+search_feedback.check_installation.not_verifiable_gateway,"Whether the Backend Gateway router's own cache was warmed up — run vendor/bin/console router:cache:warm-up:backend-gateway and submit a real ticket to confirm.",en_US
+search_feedback.check_installation.not_verifiable_gateway,"Ob der Cache des Backend-Gateway-Routers aufgewärmt wurde — führe vendor/bin/console router:cache:warm-up:backend-gateway aus und sende ein echtes Ticket, um das zu bestätigen.",de_DE
+search_feedback.check_installation.cross_reference_zed,"For core-namespace, plugin-class and ticket-table checks, run vendor/bin/console search-feedback:check-installation in Zed.",en_US
+search_feedback.check_installation.cross_reference_zed,"Für Prüfungen von Core-Namespace, Plugin-Klassen und Ticket-Tabelle führe vendor/bin/console search-feedback:check-installation in Zed aus.",de_DE
+search_feedback.check_installation.permission_denied_heading,Search Feedback: permission required,en_US
+search_feedback.check_installation.permission_denied_heading,Search Feedback: Berechtigung erforderlich,de_DE
+search_feedback.check_installation.permission_denied_body,"This installation-check page is only shown to a customer holding the SubmitSearchFeedbackTicketPermissionPlugin permission. Grant it to a Company Role in Zed → Customer → Company Roles, assign that role to your account, then reload this page.",en_US
+search_feedback.check_installation.permission_denied_body,"Diese Installationsprüfung wird nur einem Kunden mit der Berechtigung SubmitSearchFeedbackTicketPermissionPlugin angezeigt. Vergib sie in Zed → Kunde → Unternehmensrollen an eine Rolle, weise sie deinem Konto zu und lade die Seite neu.",de_DE
+permission.name.SubmitSearchFeedbackTicketPermissionPlugin,Submit search feedback tickets,en_US
+permission.name.SubmitSearchFeedbackTicketPermissionPlugin,Suchfeedback-Tickets einreichen,de_DE
