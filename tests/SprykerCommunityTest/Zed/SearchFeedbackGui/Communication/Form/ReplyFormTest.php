@@ -28,6 +28,7 @@ use Symfony\Component\Validator\Validation;
  * @group Communication
  * @group Form
  * @group ReplyFormTest
+ * @group Portable
  */
 class ReplyFormTest extends Unit
 {

@@ -28,6 +28,7 @@ use Symfony\Component\Security\Csrf\CsrfTokenManagerInterface;
  * @group Yves
  * @group SearchFeedbackWidget
  * @group SearchFeedbackWidgetFactoryTest
+ * @group Portable
  */
 class SearchFeedbackWidgetFactoryTest extends Unit
 {

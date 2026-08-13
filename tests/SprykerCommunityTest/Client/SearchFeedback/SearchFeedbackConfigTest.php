@@ -22,6 +22,7 @@ use SprykerCommunity\Shared\SearchFeedback\SearchFeedbackConfig;
  * @group Client
  * @group SearchFeedback
  * @group SearchFeedbackConfigTest
+ * @group Portable
  */
 class SearchFeedbackConfigTest extends Unit
 {

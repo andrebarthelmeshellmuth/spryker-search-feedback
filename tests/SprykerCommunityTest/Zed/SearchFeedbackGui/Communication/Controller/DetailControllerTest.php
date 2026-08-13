@@ -44,6 +44,7 @@ use SprykerCommunityTest\Zed\SearchFeedbackGui\SearchFeedbackGuiZedTester;
  * @group DetailControllerTest
  *
  * @property \SprykerCommunityTest\Zed\SearchFeedbackGui\SearchFeedbackGuiZedTester $tester
+ * @group NeedsProject
  */
 class DetailControllerTest extends Unit
 {

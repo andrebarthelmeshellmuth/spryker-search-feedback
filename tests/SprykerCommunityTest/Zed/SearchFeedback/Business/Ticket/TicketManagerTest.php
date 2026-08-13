@@ -33,6 +33,7 @@ use SprykerCommunity\Zed\SearchFeedback\Persistence\SearchFeedbackRepositoryInte
  * @group SearchFeedback
  * @group Business
  * @group TicketManagerTest
+ * @group Portable
  */
 class TicketManagerTest extends Unit
 {

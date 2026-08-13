@@ -282,6 +282,7 @@ full conversation thread + reply form + status actions):
 | `composer check-floors` (PHP 8.3, 8.4) | the declared dependency floors are real |
 | `rector` dry-run (PHP 8.3, 8.4) | no unapplied Rector rule set drifts in |
 | `phpmd` (`phpmd.xml` + `phpmd-public-methods.xml`) | cyclomatic/NPath complexity, method/class length stay reasonable — run as two separate invocations because PHPMD merges every loaded ruleset's `exclude-pattern` into one global file list per run, and only the public-method-count rule should skip Facades/Factories |
+| `portable tests` (PHP 8.3, 8.4) | this package's own `@group Portable` test subset actually passes — see "Test suite" below |
 
 Same `check-floors` rationale as the sibling `search-debug`/`search-ranking` packages: this package's
 `require` constraints are a promise about which Spryker versions an adopter may install, which a full demo
@@ -290,8 +291,33 @@ oldest allowed version and asserts every vendor symbol `src/` references still e
 
 ### Test suite
 
-The package ships Codeception suites under `tests/SprykerCommunityTest/`, one per layer, run **inside a
-host shop** (they use the host's test bootstrap and, for the Zed suites, a live Propel/MySQL connection):
+Every test class carries a portability `@group`, so `codecept run -g <tag>` tells you what a given test
+actually needs:
+
+| tag | needs | where it runs |
+|---|---|---|
+| `Portable` | nothing beyond `Generated\Shared\Transfer\*` | standalone — CI runs exactly this, see below |
+| `NeedsDatabase` | a real Propel connection | host shop only |
+| `NeedsProject` | Codeception's project-only actor/module stack, or this package's own installation diagnostics — see their own docblocks | host shop only |
+
+This package never touches Elasticsearch/OpenSearch at all, so unlike its sibling packages there is no
+`NeedsSearch` tag here.
+
+`Portable` tests run standalone in CI on every push, via `tests/codeception.portable.yml` +
+`tests/_ci-standalone/` — no host shop, no live database. The recipe: a direct `TransferBusinessFactory`
+call generates `Generated\Shared\Transfer\*` into `src/Generated/` (gitignored, exactly like a real project
+already gitignores its own — regenerated every run), bypassing the full Zed Console/Kernel bootstrap and
+Locator entirely. Run it yourself the same way CI does:
+
+```bash
+composer install
+php tests/_ci-standalone/generate-transfers.php
+vendor/bin/codecept run -c tests/codeception.portable.yml -g Portable
+```
+
+The rest of the suite — `NeedsDatabase`/`NeedsProject` — ships under `tests/SprykerCommunityTest/`, one
+per layer, and runs **inside a host shop** (they use the host's test bootstrap and, for the Zed suites, a
+live Propel/MySQL connection):
 
 ```bash
 vendor/bin/codecept build -c vendor/spryker-community/search-feedback/tests/SprykerCommunityTest/Client/SearchFeedback

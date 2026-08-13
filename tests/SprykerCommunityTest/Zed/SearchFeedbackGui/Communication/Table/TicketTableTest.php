@@ -40,6 +40,7 @@ use SprykerCommunity\Zed\SearchFeedbackGui\Dependency\Facade\SearchFeedbackGuiTo
  * @group Communication
  * @group Table
  * @group TicketTableTest
+ * @group NeedsDatabase
  */
 class TicketTableTest extends Unit
 {

@@ -22,6 +22,7 @@ use SprykerCommunity\Shared\SearchFeedback\Plugin\SubmitSearchFeedbackTicketPerm
  * @group SearchFeedback
  * @group Plugin
  * @group SubmitSearchFeedbackTicketPermissionPluginTest
+ * @group Portable
  */
 class SubmitSearchFeedbackTicketPermissionPluginTest extends Unit
 {

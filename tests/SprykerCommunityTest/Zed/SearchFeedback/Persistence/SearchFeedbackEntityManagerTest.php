@@ -28,23 +28,10 @@ use SprykerCommunity\Zed\SearchFeedback\Persistence\SearchFeedbackEntityManager;
  * @group SearchFeedback
  * @group Persistence
  * @group SearchFeedbackEntityManagerTest
+ * @group NeedsDatabase
  */
 class SearchFeedbackEntityManagerTest extends Unit
 {
-    /**
-     * @var array<\Orm\Zed\SearchFeedback\Persistence\SpySearchFeedbackTicket>
-     */
-    protected array $ticketEntities = [];
-
-    protected function _after(): void
-    {
-        foreach ($this->ticketEntities as $ticketEntity) {
-            $ticketEntity->delete();
-        }
-
-        parent::_after();
-    }
-
     public function testCreateTicketPersistsTheTicketAndItsFirstMessageInOneTransaction(): void
     {
         // Arrange
@@ -52,7 +39,6 @@ class SearchFeedbackEntityManagerTest extends Unit
 
         // Act
         $ticketTransfer = (new SearchFeedbackEntityManager())->createTicket($requestTransfer);
-        $this->trackForCleanup($ticketTransfer->getIdSearchFeedbackTicketOrFail());
 
         // Assert
         $this->assertNotNull($ticketTransfer->getIdSearchFeedbackTicket());
@@ -78,7 +64,6 @@ class SearchFeedbackEntityManagerTest extends Unit
 
         // Act
         $ticketTransfer = (new SearchFeedbackEntityManager())->createTicket($requestTransfer);
-        $this->trackForCleanup($ticketTransfer->getIdSearchFeedbackTicketOrFail());
 
         // Assert
         $this->assertSame(1, $ticketTransfer->getPageNumber());
@@ -88,7 +73,6 @@ class SearchFeedbackEntityManagerTest extends Unit
     {
         // Arrange
         $ticketTransfer = (new SearchFeedbackEntityManager())->createTicket($this->createRequestTransfer());
-        $this->trackForCleanup($ticketTransfer->getIdSearchFeedbackTicketOrFail());
 
         // Act
         (new SearchFeedbackEntityManager())->addMessage(
@@ -115,7 +99,6 @@ class SearchFeedbackEntityManagerTest extends Unit
     {
         // Arrange
         $ticketTransfer = (new SearchFeedbackEntityManager())->createTicket($this->createRequestTransfer());
-        $this->trackForCleanup($ticketTransfer->getIdSearchFeedbackTicketOrFail());
 
         // Act
         (new SearchFeedbackEntityManager())->changeStatus($ticketTransfer->getIdSearchFeedbackTicketOrFail(), SearchFeedbackConfig::STATUS_ANSWERED);
@@ -156,10 +139,5 @@ class SearchFeedbackEntityManagerTest extends Unit
             ->findOne();
 
         return $ticketEntity;
-    }
-
-    protected function trackForCleanup(int $idSearchFeedbackTicket): void
-    {
-        $this->ticketEntities[] = $this->findTicketEntity($idSearchFeedbackTicket);
     }
 }
