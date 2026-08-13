@@ -12,6 +12,7 @@
 
     <file>src/</file>
     <file>tests/</file>
+    <file>fixtures/</file>
 
     <exclude-pattern>*/tests/*/_support/_generated/*</exclude-pattern>
     <exclude-pattern>*/tests/*/_output/*</exclude-pattern>
