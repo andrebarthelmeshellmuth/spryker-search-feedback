@@ -13,13 +13,17 @@ use Closure;
 use Codeception\Test\Unit;
 use ReflectionMethod;
 use Spryker\Service\Container\ContainerInterface;
+use Spryker\Shared\EventDispatcher\EventDispatcher;
 use Spryker\Yves\Kernel\View\View;
 use SprykerCommunity\Shared\SearchFeedback\Plugin\SubmitSearchFeedbackTicketPermissionPlugin;
 use SprykerCommunity\Yves\SearchFeedbackWidget\Controller\CheckInstallationController;
+use SprykerCommunity\Yves\SearchFeedbackWidget\Plugin\EventDispatcher\SearchFeedbackReplayContextEventDispatcherPlugin;
 use SprykerCommunity\Yves\SearchFeedbackWidget\Plugin\Router\SearchFeedbackWidgetRouteProviderPlugin;
 use SprykerCommunity\Yves\SearchFeedbackWidget\Plugin\Twig\SearchFeedbackWidgetTwigPlugin;
 use Symfony\Cmf\Component\Routing\ChainRouterInterface;
+use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpKernel\KernelEvents;
 use Symfony\Component\Routing\Exception\RouteNotFoundException;
 use Twig\Environment;
 use Twig\Loader\ArrayLoader;
@@ -27,14 +31,14 @@ use Twig\TwigFunction;
 
 /**
  * `indexAction()` and its container-touching helpers (`checkTwigFunctions()`, `checkRoutes()`,
- * `isTwigFunctionCallable()`, `isRouteRegistered()`) are exercised here against a minimal hand-built
- * `ContainerInterface` fixture (a real `Twig\Environment`, a mocked router) rather than a full
- * Silex/Symfony application boot — `AbstractController` only ever reaches its container through
- * `getApplication()->get($id)`, so a fixture answering exactly the 2 service ids this controller asks for
- * (`twig`, `routers`) is a faithful stand-in without needing the real app. `can()`/`runChecks()`/`view()`
- * are partial-mocked where `indexAction()`'s own branching (not a sub-check's internals) is what's under
- * test. Mirrors the sibling spryker-community/search-debug package's identical test for its own
- * CheckInstallationController.
+ * `checkFrozenReplayEventListener()`, `isTwigFunctionCallable()`, `isRouteRegistered()`) are exercised here
+ * against a minimal hand-built `ContainerInterface` fixture (a real `Twig\Environment`/`EventDispatcher`, a
+ * mocked router) rather than a full Silex/Symfony application boot — `AbstractController` only ever reaches
+ * its container through `getApplication()->get($id)`, so a fixture answering exactly the 3 service ids this
+ * controller asks for (`twig`, `dispatcher`, `routers`) is a faithful stand-in without needing the real
+ * app. `can()`/`runChecks()`/`view()` are partial-mocked where `indexAction()`'s own branching (not a
+ * sub-check's internals) is what's under test. Mirrors the sibling spryker-community/search-debug
+ * package's identical test for its own CheckInstallationController.
  *
  * Auto-generated group annotations
  *
@@ -92,24 +96,27 @@ class CheckInstallationControllerTest extends Unit
         $this->assertSame('@SearchFeedbackWidget/views/check-installation/check-installation.twig', $result->getTemplate());
     }
 
-    public function testRunChecksReturnsBothChecksInOrder(): void
+    public function testRunChecksReturnsAllThreeChecksInOrder(): void
     {
         // Arrange — a container that passes every individual check, so the only thing under test here is
-        // that both run and land in the right order.
+        // that all three run and land in the right order.
         $twig = new Environment(new ArrayLoader());
         $twig->addFunction(new TwigFunction(SearchFeedbackWidgetTwigPlugin::FUNCTION_NAME_CAN_SUBMIT_TICKET, fn () => true));
         $twig->addFunction(new TwigFunction(SearchFeedbackWidgetTwigPlugin::FUNCTION_NAME_TICKET_CSRF_TOKEN, fn () => ''));
         $twig->addFunction(new TwigFunction(SearchFeedbackWidgetTwigPlugin::FUNCTION_NAME_GET_TOPICS, fn () => []));
+        $dispatcher = new EventDispatcher();
+        (new SearchFeedbackReplayContextEventDispatcherPlugin())->extend($dispatcher, $this->createMock(ContainerInterface::class));
         $router = $this->createMock(ChainRouterInterface::class);
         $router->method('generate')->willReturn('/some/url');
 
         // Act
-        $checks = $this->invokeProtectedMethod('runChecks', [], $this->createContainer($twig, $router));
+        $checks = $this->invokeProtectedMethod('runChecks', [], $this->createContainer($twig, $dispatcher, $router));
 
         // Assert
-        $this->assertCount(2, $checks);
+        $this->assertCount(3, $checks);
         $this->assertTrue($checks[0]['passed']);
         $this->assertTrue($checks[1]['passed']);
+        $this->assertTrue($checks[2]['passed']);
     }
 
     public function testCheckTwigFunctionsReturnsPassedWhenAllThreeAreRegistered(): void
@@ -185,7 +192,7 @@ class CheckInstallationControllerTest extends Unit
         $router->method('generate')->willReturn('/some/url');
 
         // Act
-        $check = $this->invokeProtectedMethod('checkRoutes', [], $this->createContainer(null, $router));
+        $check = $this->invokeProtectedMethod('checkRoutes', [], $this->createContainer(null, null, $router));
 
         // Assert
         $this->assertTrue($check['passed']);
@@ -199,7 +206,7 @@ class CheckInstallationControllerTest extends Unit
         $router->method('generate')->willThrowException(new RouteNotFoundException());
 
         // Act
-        $check = $this->invokeProtectedMethod('checkRoutes', [], $this->createContainer(null, $router));
+        $check = $this->invokeProtectedMethod('checkRoutes', [], $this->createContainer(null, null, $router));
 
         // Assert
         $this->assertFalse($check['passed']);
@@ -213,7 +220,7 @@ class CheckInstallationControllerTest extends Unit
         $router->method('generate')->willReturn('/some/url');
 
         // Act
-        $isRegistered = $this->invokeProtectedMethod('isRouteRegistered', [SearchFeedbackWidgetRouteProviderPlugin::ROUTE_NAME_SUBMIT_TICKET], $this->createContainer(null, $router));
+        $isRegistered = $this->invokeProtectedMethod('isRouteRegistered', [SearchFeedbackWidgetRouteProviderPlugin::ROUTE_NAME_SUBMIT_TICKET], $this->createContainer(null, null, $router));
 
         // Assert
         $this->assertTrue($isRegistered);
@@ -226,10 +233,96 @@ class CheckInstallationControllerTest extends Unit
         $router->method('generate')->willThrowException(new RouteNotFoundException());
 
         // Act
-        $isRegistered = $this->invokeProtectedMethod('isRouteRegistered', ['some-route'], $this->createContainer(null, $router));
+        $isRegistered = $this->invokeProtectedMethod('isRouteRegistered', ['some-route'], $this->createContainer(null, null, $router));
 
         // Assert
         $this->assertFalse($isRegistered);
+    }
+
+    public function testCheckFrozenReplayEventListenerReturnsPassedWhenTheListenerIsRegistered(): void
+    {
+        // Arrange
+        $dispatcher = new EventDispatcher();
+        (new SearchFeedbackReplayContextEventDispatcherPlugin())->extend($dispatcher, $this->createMock(ContainerInterface::class));
+
+        // Act
+        $check = $this->invokeProtectedMethod('checkFrozenReplayEventListener', [], $this->createContainer(null, $dispatcher));
+
+        // Assert
+        $this->assertTrue($check['passed']);
+        $this->assertNull($check['remedy']);
+    }
+
+    public function testCheckFrozenReplayEventListenerReturnsFailedWithARemedyWhenTheListenerIsNotRegistered(): void
+    {
+        // Arrange
+        $dispatcher = new EventDispatcher();
+
+        // Act
+        $check = $this->invokeProtectedMethod('checkFrozenReplayEventListener', [], $this->createContainer(null, $dispatcher));
+
+        // Assert
+        $this->assertFalse($check['passed']);
+        $this->assertStringContainsString('EventDispatcherDependencyProvider.php', $check['remedy']);
+    }
+
+    public function testIsListenerBoundReturnsTrueWhenThePluginRegisteredAListenerForTheEvent(): void
+    {
+        // Arrange
+        $eventDispatcher = new EventDispatcher();
+        $plugin = new SearchFeedbackReplayContextEventDispatcherPlugin();
+        $plugin->extend($eventDispatcher, $this->createMock(ContainerInterface::class));
+
+        // Act
+        $isBound = $this->invokeIsListenerBound($eventDispatcher, KernelEvents::REQUEST, SearchFeedbackReplayContextEventDispatcherPlugin::class);
+
+        // Assert
+        $this->assertTrue($isBound);
+    }
+
+    public function testIsListenerBoundReturnsFalseWhenNoListenerIsRegisteredForTheEvent(): void
+    {
+        // Arrange
+        $eventDispatcher = new EventDispatcher();
+
+        // Act
+        $isBound = $this->invokeIsListenerBound($eventDispatcher, KernelEvents::REQUEST, SearchFeedbackReplayContextEventDispatcherPlugin::class);
+
+        // Assert
+        $this->assertFalse($isBound);
+    }
+
+    /**
+     * A listener IS registered for the event, but bound to an unrelated object — confirms the check
+     * identifies the specific plugin by its closure's bound `$this`, not merely "something listens".
+     */
+    public function testIsListenerBoundReturnsFalseWhenTheRegisteredListenerBelongsToADifferentClass(): void
+    {
+        // Arrange
+        $eventDispatcher = new EventDispatcher();
+        $unrelatedListenerOwner = new class {
+        };
+        $listener = Closure::bind(function (): void {
+        }, $unrelatedListenerOwner);
+        $eventDispatcher->addListener(KernelEvents::REQUEST, $listener);
+
+        // Act
+        $isBound = $this->invokeIsListenerBound($eventDispatcher, KernelEvents::REQUEST, SearchFeedbackReplayContextEventDispatcherPlugin::class);
+
+        // Assert
+        $this->assertFalse($isBound);
+    }
+
+    /**
+     * @param \Spryker\Shared\EventDispatcher\EventDispatcher $eventDispatcher
+     * @param string $eventName
+     * @param class-string $listenerClassName
+     */
+    protected function invokeIsListenerBound(EventDispatcher $eventDispatcher, string $eventName, string $listenerClassName): bool
+    {
+        $reflectionMethod = new ReflectionMethod(CheckInstallationController::class, 'isListenerBound');
+
+        return $reflectionMethod->invoke(new CheckInstallationController(), $eventDispatcher, $eventName, $listenerClassName);
     }
 
     /**
@@ -253,18 +346,23 @@ class CheckInstallationControllerTest extends Unit
     }
 
     /**
-     * A minimal `ContainerInterface` fixture answering exactly the 2 service ids `AbstractController`'s
-     * `getTwig()`/`getRouter()` ask for — every other `ContainerInterface` method is unused by this
-     * controller and stubbed as a no-op.
+     * A minimal `ContainerInterface` fixture answering exactly the 3 service ids `AbstractController`'s
+     * `getTwig()`/`getApplication()->get('dispatcher')`/`getRouter()` ask for — every other
+     * `ContainerInterface` method is unused by this controller and stubbed as a no-op.
      *
      * @param \Twig\Environment|null $twig
+     * @param \Symfony\Component\EventDispatcher\EventDispatcherInterface|null $dispatcher
      * @param \Symfony\Cmf\Component\Routing\ChainRouterInterface|null $router
      */
-    protected function createContainer(?Environment $twig = null, ?ChainRouterInterface $router = null): ContainerInterface
-    {
-        return new class ($twig, $router) implements ContainerInterface {
+    protected function createContainer(
+        ?Environment $twig = null,
+        ?EventDispatcherInterface $dispatcher = null,
+        ?ChainRouterInterface $router = null,
+    ): ContainerInterface {
+        return new class ($twig, $dispatcher, $router) implements ContainerInterface {
             public function __construct(
                 protected ?Environment $twig,
+                protected ?EventDispatcherInterface $dispatcher,
                 protected ?ChainRouterInterface $router,
             ) {
             }
@@ -278,6 +376,7 @@ class CheckInstallationControllerTest extends Unit
             {
                 return match ($id) {
                     'twig' => $this->twig,
+                    'dispatcher' => $this->dispatcher,
                     'routers' => $this->router,
                     default => null,
                 };

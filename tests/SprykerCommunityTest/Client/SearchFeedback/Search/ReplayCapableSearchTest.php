@@ -10,6 +10,8 @@ declare(strict_types = 1);
 namespace SprykerCommunityTest\Client\SearchFeedback\Search;
 
 use Codeception\Test\Unit;
+use Elastica\Query;
+use Elastica\Response;
 use Elastica\ResultSet;
 use Generated\Shared\Transfer\CustomerTransfer;
 use Generated\Shared\Transfer\SearchFeedbackTicketSrpSnapshotResponseTransfer;
@@ -18,8 +20,8 @@ use Spryker\Client\Customer\CustomerClientInterface;
 use Spryker\Client\SearchElasticsearch\Search\SearchInterface;
 use Spryker\Client\SearchExtension\Dependency\Plugin\QueryInterface;
 use Spryker\Client\SearchExtension\Dependency\Plugin\ResultFormatterPluginInterface;
-use SprykerCommunity\Client\SearchFeedback\SearchFeedbackClientInterface;
 use SprykerCommunity\Client\SearchFeedback\Search\ReplayCapableSearch;
+use SprykerCommunity\Client\SearchFeedback\SearchFeedbackClientInterface;
 use SprykerCommunity\Shared\SearchFeedback\SearchFeedbackConfig;
 
 /**
@@ -39,7 +41,7 @@ class ReplayCapableSearchTest extends Unit
     {
         // Arrange
         $searchQueryMock = $this->createMock(QueryInterface::class);
-        $liveResult = new ResultSet(new \Elastica\Response('{}'), \Elastica\Query::create([]), []);
+        $liveResult = new ResultSet(new Response('{}'), Query::create([]), []);
 
         $decoratedSearchMock = $this->createMock(SearchInterface::class);
         $decoratedSearchMock->expects($this->once())

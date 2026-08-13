@@ -50,6 +50,13 @@ class GatewayController extends AbstractGatewayController
      * `SearchFeedbackReplayContextEventDispatcherPlugin` is a UX gate (bounce to login early), not the
      * authorization boundary; this is.
      *
+     * Deliberately checks only "does this customer hold ViewSearchFeedbackTicketReplayPermissionPlugin",
+     * not "does this ticket belong to this customer/their company" — a customer holding the permission can
+     * replay ANY ticket by id, not just their own. Confirmed intentional: same posture Zed's own ticket
+     * grid already has (any admin sees every ticket, no per-submitter row-level scoping — see the package
+     * README's Limitations section), extended here to the Yves-granted permission instead of a Zed ACL
+     * role. Not an oversight — do not add an ownership check without discussing it first.
+     *
      * @param \Generated\Shared\Transfer\SearchFeedbackTicketSrpSnapshotRequestTransfer $requestTransfer
      */
     public function getTicketSrpSnapshotAction(SearchFeedbackTicketSrpSnapshotRequestTransfer $requestTransfer): SearchFeedbackTicketSrpSnapshotResponseTransfer

@@ -16,8 +16,11 @@ use SimpleXMLElement;
 use Spryker\Shared\Config\Config;
 use Spryker\Shared\Kernel\KernelConstants;
 use Spryker\Zed\Kernel\Communication\Console\Console;
+use SprykerCommunity\Client\SearchFeedback\Plugin\Catalog\SearchFeedbackSnapshotResultFormatterPlugin;
+use SprykerCommunity\Client\SearchFeedback\Search\ReplayCapableSearch;
 use SprykerCommunity\Client\SearchFeedback\SearchFeedbackClient;
 use SprykerCommunity\Shared\SearchFeedback\Plugin\SubmitSearchFeedbackTicketPermissionPlugin;
+use SprykerCommunity\Shared\SearchFeedback\Plugin\ViewSearchFeedbackTicketReplayPermissionPlugin;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 use Throwable;
@@ -44,8 +47,9 @@ use Throwable;
  * Complementary counterpart:
  * {@see \SprykerCommunity\Yves\SearchFeedbackWidget\Controller\CheckInstallationController} (the
  * `/search-feedback-widget/check-installation` page) closes exactly the Yves-side gap this command names
- * above — the Twig functions and the submit-ticket route — by running from inside the real Yves DI
- * container. It does not re-check anything this command already covers; run both for a full picture.
+ * above — the Twig functions, the submit-ticket route, and the frozen-replay event listener (step 11) — by
+ * running from inside the real Yves DI container. It does not re-check anything this command already
+ * covers; run both for a full picture.
  *
  * @method \SprykerCommunity\Zed\SearchFeedback\Business\SearchFeedbackFacadeInterface getFacade()
  * @method \SprykerCommunity\Zed\SearchFeedback\Communication\SearchFeedbackCommunicationFactory getFactory()
@@ -81,6 +85,14 @@ class SearchFeedbackCheckInstallationConsole extends Console
      * @var string
      */
     protected const PACKAGE_ROOT_RELATIVE_PATH = '/../../../../../..';
+
+    /**
+     * The project-level Client Factory override that README step 11 asks for — the seam that actually
+     * swaps a live ES call for the frozen snapshot. Relative to `APPLICATION_ROOT_DIR`.
+     *
+     * @var string
+     */
+    protected const SEARCH_ELASTICSEARCH_FACTORY_OVERRIDE_RELATIVE_PATH = '/src/Pyz/Client/SearchElasticsearch/SearchElasticsearchFactory.php';
 
     /**
      * The locale whose catalog defines the expected key set; the others are kept at parity with it.
@@ -131,6 +143,7 @@ class SearchFeedbackCheckInstallationConsole extends Console
         $this->checkNavigationRegistered($output);
         $this->checkBackOfficeAccess($output);
         $this->checkZedTranslationCatalogComplete($output);
+        $this->checkFrozenReplayWiring($output);
 
         $output->writeln('');
 
@@ -155,6 +168,11 @@ class SearchFeedbackCheckInstallationConsole extends Console
         $output->writeln('  - the Backend Gateway router cache (step 8) — its OWN cache, separate from every other Zed');
         $output->writeln('    page\'s router; run `vendor/bin/console router:cache:warm-up:backend-gateway` if ticket');
         $output->writeln('    submission alone 404s while everything else works.');
+        $output->writeln('  - three of the four frozen-replay registrations (step 11): the Client');
+        $output->writeln('    CATALOG_SEARCH_RESULT_FORMATTER_PLUGINS entry, and both Permission DependencyProvider');
+        $output->writeln('    entries for ViewSearchFeedbackTicketReplayPermissionPlugin — this command can only see the');
+        $output->writeln('    SearchElasticsearchFactory override (checked above). The Yves EventDispatcher entry for');
+        $output->writeln('    that same step is checked by the Yves counterpart below.');
         $output->writeln('');
         $output->writeln('The first of those is checkable from Yves: load /search-feedback-widget/check-installation as a');
         $output->writeln('permitted customer (SprykerCommunity\Yves\SearchFeedbackWidget\Controller\CheckInstallationController).');
@@ -197,6 +215,9 @@ class SearchFeedbackCheckInstallationConsole extends Console
         $requiredClasses = [
             'permission plugin' => SubmitSearchFeedbackTicketPermissionPlugin::class,
             'search feedback client' => SearchFeedbackClient::class,
+            'replay permission plugin' => ViewSearchFeedbackTicketReplayPermissionPlugin::class,
+            'snapshot result formatter plugin' => SearchFeedbackSnapshotResultFormatterPlugin::class,
+            'replay-capable search decorator' => ReplayCapableSearch::class,
         ];
 
         foreach ($requiredClasses as $label => $className) {
@@ -333,6 +354,61 @@ class SearchFeedbackCheckInstallationConsole extends Console
             $restrictedRoleCount,
             implode('/', $moduleNames),
         );
+    }
+
+    /**
+     * README step 11 (frozen replay) is optional, so a missing wire-up is a WARNING, never a failure — same
+     * posture as {@see checkBackOfficeAccess()}. But of the four registrations that step asks for, this is
+     * the one this command can actually see: the project-level `Pyz\Client\SearchElasticsearch\
+     * SearchElasticsearchFactory` override that wraps the real `Search` in {@see ReplayCapableSearch}. Miss
+     * it and "View SRP" on a ticket with a snapshot silently falls back to a live search instead of erroring
+     * — the exact drift this feature exists to close, and nothing in any log says so.
+     *
+     * The other three registrations from step 11 are NOT checkable from here: the Client
+     * `CATALOG_SEARCH_RESULT_FORMATTER_PLUGINS` and both Permission DependencyProviders are DI wiring this
+     * command has no way to introspect from Zed's own container (same blind spot as every other
+     * DependencyProvider registration in this file — only class loadability is checked, above), and the
+     * Yves `EventDispatcherDependencyProvider` entry is a Yves-container concern entirely, closed by the
+     * Yves counterpart instead (see the final output block).
+     *
+     * @param \Symfony\Component\Console\Output\OutputInterface $output
+     */
+    protected function checkFrozenReplayWiring(OutputInterface $output): void
+    {
+        $overrideFilePath = $this->getSearchElasticsearchFactoryOverrideFilePath();
+
+        if (!is_readable($overrideFilePath)) {
+            $this->warnings[] = sprintf(
+                'Frozen replay is not wired up: no project-level %s override exists (README step 11). "View SRP" on a ticket with a snapshot will silently run a live search instead of replaying it — no error, just drift. Skip this if you intentionally do not use frozen replay.',
+                static::SEARCH_ELASTICSEARCH_FACTORY_OVERRIDE_RELATIVE_PATH,
+            );
+
+            return;
+        }
+
+        $overrideFileContents = (string)file_get_contents($overrideFilePath);
+
+        if (!str_contains($overrideFileContents, 'ReplayCapableSearch')) {
+            $this->warnings[] = sprintf(
+                'Frozen replay is not wired up: %s exists but does not reference ReplayCapableSearch, so createSearchClient() still returns the plain live Search (README step 11). "View SRP" on a ticket with a snapshot will silently run a live search instead of replaying it.',
+                static::SEARCH_ELASTICSEARCH_FACTORY_OVERRIDE_RELATIVE_PATH,
+            );
+
+            return;
+        }
+
+        $output->writeln('<info>✓</info> project-level SearchElasticsearchFactory override wraps Search in ReplayCapableSearch (frozen replay wired up)');
+    }
+
+    /**
+     * Isolated as its own method (rather than inlined in {@see checkFrozenReplayWiring()}) so a test can
+     * override it to point at a fixture file instead of this host shop's real
+     * `src/Pyz/Client/SearchElasticsearch/SearchElasticsearchFactory.php` — unlike the ticket-table check,
+     * there is no Facade seam to mock a filesystem read through.
+     */
+    protected function getSearchElasticsearchFactoryOverrideFilePath(): string
+    {
+        return APPLICATION_ROOT_DIR . static::SEARCH_ELASTICSEARCH_FACTORY_OVERRIDE_RELATIVE_PATH;
     }
 
     /**
