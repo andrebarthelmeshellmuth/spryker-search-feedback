@@ -12,6 +12,7 @@
     csrfToken: required,
     submitUrl: required,
     topics: [],
+    snapshotToken: '',
 } %}
 
 {% block body %}
@@ -29,6 +30,9 @@
                 <input type="hidden" name="searchTerm" value="{{ data.searchTerm }}">
                 <input type="hidden" name="pageNumber" value="{{ data.pageNumber }}">
                 <input type="hidden" name="queryString" value="{{ app.request.queryString }}">
+                {% if data.snapshotToken %}
+                    <input type="hidden" name="snapshotToken" value="{{ data.snapshotToken }}">
+                {% endif %}
                 {% for sku in data.skuList %}
                     <input type="hidden" name="skuList[]" value="{{ sku }}">
                 {% endfor %}

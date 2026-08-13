@@ -11,6 +11,7 @@ namespace SprykerCommunity\Zed\SearchFeedback\Persistence;
 
 use Orm\Zed\SearchFeedback\Persistence\SpySearchFeedbackTicketMessageQuery;
 use Orm\Zed\SearchFeedback\Persistence\SpySearchFeedbackTicketQuery;
+use Orm\Zed\SearchFeedback\Persistence\SpySearchFeedbackTicketSrpSnapshotQuery;
 use Spryker\Zed\Kernel\Persistence\AbstractPersistenceFactory;
 use SprykerCommunity\Zed\SearchFeedback\Persistence\Propel\Mapper\SearchFeedbackMapper;
 
@@ -24,6 +25,11 @@ class SearchFeedbackPersistenceFactory extends AbstractPersistenceFactory
     public function createSearchFeedbackTicketMessageQuery(): SpySearchFeedbackTicketMessageQuery
     {
         return SpySearchFeedbackTicketMessageQuery::create();
+    }
+
+    public function createSearchFeedbackTicketSrpSnapshotQuery(): SpySearchFeedbackTicketSrpSnapshotQuery
+    {
+        return SpySearchFeedbackTicketSrpSnapshotQuery::create();
     }
 
     public function createSearchFeedbackMapper(): SearchFeedbackMapper

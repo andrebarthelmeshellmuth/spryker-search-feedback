@@ -13,6 +13,7 @@ use Generated\Shared\Transfer\SearchFeedbackTicketRequestTransfer;
 use Generated\Shared\Transfer\SearchFeedbackTicketTransfer;
 use Orm\Zed\SearchFeedback\Persistence\SpySearchFeedbackTicket;
 use Orm\Zed\SearchFeedback\Persistence\SpySearchFeedbackTicketMessage;
+use Orm\Zed\SearchFeedback\Persistence\SpySearchFeedbackTicketSrpSnapshot;
 use Spryker\Zed\Kernel\Persistence\AbstractEntityManager;
 use Spryker\Zed\Kernel\Persistence\EntityManager\TransactionHandlerInterface;
 use Spryker\Zed\Kernel\Persistence\EntityManager\TransactionTrait;
@@ -58,9 +59,23 @@ class SearchFeedbackEntityManager extends AbstractEntityManager implements Searc
             $messageEntity->setCustomerReference($requestTransfer->getCustomerReferenceOrFail());
             $messageEntity->save();
 
+            $snapshotTransfer = $requestTransfer->getSnapshot();
+            $hasSnapshot = $snapshotTransfer !== null;
+
+            if ($snapshotTransfer !== null) {
+                $snapshotEntity = new SpySearchFeedbackTicketSrpSnapshot();
+                $snapshotEntity->setFkSearchFeedbackTicket($ticketEntity->getIdSearchFeedbackTicket());
+                $snapshotEntity->setRawResponse($snapshotTransfer->getRawResponseOrFail());
+                $snapshotEntity->setQueryDsl($snapshotTransfer->getQueryDslOrFail());
+                $snapshotEntity->setRequestParameters($snapshotTransfer->getRequestParameters());
+                $snapshotEntity->setHasTermVectorSnapshot($snapshotTransfer->getHasTermVectorSnapshot() ?? false);
+                $snapshotEntity->setTermVectorSnapshot($snapshotTransfer->getTermVectorSnapshot());
+                $snapshotEntity->save();
+            }
+
             return $this->getFactory()
                 ->createSearchFeedbackMapper()
-                ->mapTicketEntityToTransfer($ticketEntity, new SearchFeedbackTicketTransfer(), [$messageEntity]);
+                ->mapTicketEntityToTransfer($ticketEntity, new SearchFeedbackTicketTransfer(), [$messageEntity], $hasSnapshot);
         });
     }
 

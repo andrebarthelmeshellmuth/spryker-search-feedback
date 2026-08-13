@@ -58,6 +58,11 @@ class SubmitTicketController extends AbstractController
     /**
      * @var string
      */
+    protected const PARAM_SNAPSHOT_TOKEN = 'snapshotToken';
+
+    /**
+     * @var string
+     */
     protected const PARAM_CSRF_TOKEN = '_csrf_token';
 
     /**
@@ -118,6 +123,7 @@ class SubmitTicketController extends AbstractController
         }
 
         $skuList = (array)$request->request->all(static::PARAM_SKU_LIST);
+        $snapshotToken = (string)$request->request->get(static::PARAM_SNAPSHOT_TOKEN, '');
 
         $requestTransfer = (new SearchFeedbackTicketRequestTransfer())
             ->setTopic((string)$request->request->get(static::PARAM_TOPIC, ''))
@@ -129,6 +135,10 @@ class SubmitTicketController extends AbstractController
             ->setStoreName($this->getFactory()->getStoreClient()->getCurrentStore()->getNameOrFail())
             ->setLocaleName($this->getLocale())
             ->setCustomerReference($customerTransfer->getCustomerReference());
+
+        if ($snapshotToken !== '') {
+            $requestTransfer->setSnapshot($this->getFactory()->getSearchFeedbackClient()->consumeSnapshot($snapshotToken));
+        }
 
         $responseTransfer = $this->getFactory()->getSearchFeedbackClient()->submitTicket($requestTransfer);
 

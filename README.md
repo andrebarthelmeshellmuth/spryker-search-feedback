@@ -27,10 +27,11 @@ to read it, or any reply, back from the storefront. Everything past submission h
 
 Structurally close to [spryker-community/search-ranking-optimizer](https://github.com/andrebarthelmeshellmuth/spryker-search-ranking-optimizer)'s
 SRP relevance-rating widget (Yves widget → Gateway-controller write → Zed persistence), but a different
-bounded context: this is qualitative support/VoC ticketing, not a numeric ranking signal. It has no
-dependency on `search-ranking`/`search-ranking-optimizer`'s tuning machinery, and no dependency on
-`search-debug`'s Elasticsearch `explain` internals — it only reads the query/filter/SKU state already on
-the rendered SRP. Kept standalone so a shop can install it without either of those.
+bounded context: this is qualitative support/VoC ticketing, not a numeric ranking signal. It has no hard
+dependency on `search-ranking`/`search-ranking-optimizer`'s tuning machinery — the optional integration
+that lets a ticket's frozen snapshot also carry search-ranking's specificity-weighting result is a soft
+`suggest`-only coupling (see [Installation](#installation)), the same shape `search-ranking` itself already
+uses toward `search-debug`. Kept standalone so a shop can install it without any of those.
 
 ## Status
 
@@ -54,6 +55,15 @@ both browser Presentation suites, including real-database integration coverage f
   triage view, not a per-market page); the ticket detail page shows the customer's email (resolved from
   their customer reference, cached per page load) instead of the raw reference, and a "View search results"
   link that reconstructs the exact SRP the ticket was filed from, in either dynamic-store-mode configuration.
+- **Frozen replay.** Ranking isn't stable over time in a typical shop — nightly randomized tie-breaking,
+  regularly-refreshed business scores, an optimizer retuning formula weights — so re-running the same query
+  later often shows a different page than the one a ticket was filed about. When the optional wiring in
+  [Installation](#installation) is registered, this package captures the raw Elasticsearch response (and,
+  if `spryker-community/search-ranking` is installed, its specificity-weighting result) at the moment a
+  ticket is filed, and the "View search results" link replays that exact frozen response instead of running
+  a live search — while still rendering it through today's live template/formatter code, so only the
+  ranking data itself is frozen. A ticket filed before this feature existed, or on a shop that hasn't wired
+  it, falls back to a live search exactly as before — this is additive, never a hard requirement.
 
 The SRP ticket form (rendered below the product grid, outside the filter form — see step 5), the Zed
 ticket grid (List of Tickets, sortable/searchable via DataTables), and a ticket's detail page (context +
@@ -70,10 +80,12 @@ full conversation thread + reply form + status actions):
 - PHP >= 8.3
 - Spryker (kernel/gui/acl/customer/company-user/store/permission-extension/propel-orm/transfer/user/
   zed-request — see `composer.json` for floors, verified by `composer check-floors`)
-- **No search engine required.** Unlike the sibling `search-debug`/`search-ranking`/
-  `search-ranking-optimizer` packages, this one never queries Elasticsearch/OpenSearch — a ticket only
-  *records* the query/filters/page/SKUs a customer was looking at, it never re-runs or re-scores that
-  search. Propel/MySQL is the only datastore.
+- **Elasticsearch/OpenSearch, via `spryker/search-elasticsearch`.** Unlike earlier versions of this
+  package, it now also *captures* the raw search response for a ticket's frozen replay (see
+  [What it does](#what-it-does)) — but it still never issues its own query. The only place this package
+  talks to the search engine at all is reconstructing a previously-captured response from stored data
+  (`Elastica\Response`/`Query`/`ResultSet\DefaultBuilder`), never a live call. Propel/MySQL remains the only
+  real datastore.
 - **B2B company-user accounts.** `CompanyUserPermissionAuthorizer` resolves "does this customer actually
   hold `SubmitSearchFeedbackTicketPermissionPlugin`" via their active `CompanyUser`, the same
   permission-granting mechanism the rest of a B2B shop already uses (same posture as the sibling
@@ -134,6 +146,7 @@ full conversation thread + reply form + status actions):
            csrfToken: searchFeedbackTicketCsrfToken(),
            submitUrl: storePrefix ~ '/search-feedback-widget/submit-ticket',
            topics: getSearchFeedbackTicketTopics(),
+           snapshotToken: data.searchFeedbackSnapshot.token | default(''),
        },
    } only %}
    ```
@@ -173,6 +186,38 @@ full conversation thread + reply form + status actions):
     generate route: Route 'search-feedback-widget/submit-ticket' not found` the moment the ticket-form
     include tries to build its `submitUrl`. Standard practice for any package that adds a Yves route, not
     unique to this one, but easy to forget mid-walkthrough since nothing points at it explicitly.
+11. **Frozen replay wiring** (optional but recommended — without it, "View SRP" on the Zed ticket detail
+    page just re-runs a live search, which is the exact drift this feature exists to close; see
+    [What it does](#what-it-does)):
+    - Register `SearchFeedbackSnapshotResultFormatterPlugin` in the Client `CatalogDependencyProvider`'s
+      `CATALOG_SEARCH_RESULT_FORMATTER_PLUGINS` list.
+    - Register `SearchFeedbackReplayContextEventDispatcherPlugin` in the Yves
+      `EventDispatcherDependencyProvider::getEventDispatcherPlugins()`.
+    - Register `ViewSearchFeedbackTicketReplayPermissionPlugin` in both the Client and Zed
+      `PermissionDependencyProvider::getPermissionPlugins()`, and grant it to whichever company role should
+      be able to review a replay — same mechanism as step 4, a separate, independently-grantable permission.
+    - Add a project-level `Pyz\Client\SearchElasticsearch\SearchElasticsearchFactory` overriding
+      `createSearchClient()` to wrap the real `Search` in `ReplayCapableSearch` — this is the seam that
+      actually swaps a live ES call for the frozen snapshot; see the class's own docblock. First
+      Factory-level (not just DependencyProvider-level) override this package needs — a new pattern if
+      your project hasn't overridden a vendor Client Factory before, but a small one:
+      ```php
+      class SearchElasticsearchFactory extends SprykerSearchElasticsearchFactory
+      {
+          public function createSearchClient(): SearchInterface
+          {
+              return new ReplayCapableSearch(
+                  parent::createSearchClient(),
+                  Locator::getInstance()->searchFeedback()->client(),
+                  Locator::getInstance()->customer()->client(),
+              );
+          }
+      }
+      ```
+    - Optional, only if `spryker-community/search-ranking` is also installed: register
+      `SprykerCommunity\Client\SearchRanking\Plugin\SearchFeedback\SearchFeedbackTermVectorSnapshotProviderPlugin`
+      in your project's `Pyz\Client\SearchFeedback\SearchFeedbackDependencyProvider::getTermVectorSnapshotProviderPlugins()`
+      override, so a ticket's snapshot also carries the specificity-weighting result that scored it.
 11. In the Zed ACL module, create your "ticket worker" and "feedback admin" groups and grant/deny access to
     `SearchFeedbackGui/Detail/changeStatus` accordingly — this package ships no ACL fixture data.
 12. **Translations.** Two separate mechanisms, one per layer — Zed's `trans` filter does **not** read from
@@ -268,6 +313,17 @@ full conversation thread + reply form + status actions):
   admin to leave a note for another without the customer's original message context, since there's no
   customer-facing view to accidentally leak an internal note into anyway; the constraint here is purely
   "everyone with access sees everything," not a security boundary between Zed users.
+- **A frozen snapshot can go stale relative to today's product/index data.** The captured `_source` is
+  exactly what Elasticsearch returned at ticket-filing time; if a field gets renamed or restructured by a
+  later reindex, replaying an old ticket runs that old-shaped data through today's formatters, which can
+  silently show a missing badge/facet rather than error. Accepted trade-off, not a bug — the alternative
+  (migrating every stored snapshot forward on every reindex) is far more machinery than this feature
+  warrants.
+- **The stored `queryDsl` field can go stale for a different reason.** It's captured for informational
+  display only, never replayed — `Spryker\Client\SearchElasticsearch\Search\Search::executeQuery()` never
+  passes Elastica's `$options` through, so anything out-of-band a future ranking strategy might add
+  (`search_pipeline`, a neural rerank pass) would be invisible to it. Not a concern for replay itself, since
+  replay only ever uses the raw response.
 
 ## Testing and CI
 

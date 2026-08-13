@@ -24,6 +24,33 @@
         <property name="customerReference" type="string"/>
         <property name="storeName" type="string"/>
         <property name="localeName" type="string"/>
+        <property name="snapshot" type="SearchFeedbackTicketSrpSnapshot"/>
+    </transfer>
+
+    <!-- The frozen search-results-page data captured at the moment the ticket was filed — the raw
+         Elasticsearch response and query DSL this package's own capture plugins (registered by the host
+         project in CATALOG_SEARCH_QUERY_EXPANDER_PLUGINS/CATALOG_SEARCH_RESULT_FORMATTER_PLUGINS, see
+         README) saw for THIS request. Unlike filters/skuList/searchTerm above, this is server-side,
+         request-scoped data — a submitter cannot forge it — but it is optional: a shop that hasn't wired
+         the capture plugins (or an older ticket filed before this feature existed) has no snapshot, and
+         `hasSnapshot` on the parent transfer is how a consumer tells "no snapshot" apart from "an empty
+         one". rawResponse/queryDsl/requestParameters are JSON-encoded strings, not nested transfers/arrays
+         — they are opaque payloads reconstructed directly into `Elastica\Response`/`Elastica\Query` objects
+         at replay time (see `ReplayCapableSearch`), never inspected field-by-field by this package itself.
+         hasTermVectorSnapshot/termVectorSnapshot are the analogous optional capture from search-ranking's
+         specificity weighting (via the soft-coupled TermVectorSnapshotProviderPluginInterface) — a
+         JSON-encoded SearchRankingSpecificityWeightingResultTransfer (relevanceWeight, normalizedSpecificity,
+         shift, and the exponent/magnitude that produced it), NOT the raw Elasticsearch `_termvectors`
+         response itself, which search-ranking never retains past the request that fetched it. Set once at
+         capture time and never re-derived from live config on replay, so a since-changed
+         `isSpecificityWeightingEnabled()` flag can't silently backfill or drop data a ticket never actually
+         had. -->
+    <transfer name="SearchFeedbackTicketSrpSnapshot" strict="true">
+        <property name="rawResponse" type="string"/>
+        <property name="queryDsl" type="string"/>
+        <property name="requestParameters" type="string"/>
+        <property name="hasTermVectorSnapshot" type="bool"/>
+        <property name="termVectorSnapshot" type="string"/>
     </transfer>
 
     <!-- Zed -> Yves gateway response. isSuccess=false covers both an unauthorized caller (re-checked
@@ -52,6 +79,8 @@
         <property name="createdAt" type="string"/>
         <property name="updatedAt" type="string"/>
         <property name="messages" type="SearchFeedbackTicketMessage[]" singular="message"/>
+        <property name="hasSnapshot" type="bool"/>
+        <property name="snapshot" type="SearchFeedbackTicketSrpSnapshot"/>
     </transfer>
 
     <!-- One message in a ticket's thread. authorType is one of SearchFeedbackConfig::AUTHOR_TYPE_* —
@@ -76,6 +105,25 @@
 
     <transfer name="SearchFeedbackTicketCollection" strict="true">
         <property name="tickets" type="SearchFeedbackTicket[]" singular="ticket"/>
+    </transfer>
+
+    <!-- Yves -> Zed gateway request for a replay: fetches a ticket's frozen SRP snapshot by id.
+         customerReference is set server-side by the Yves event dispatcher plugin from the authenticated
+         session (same trust posture as SearchFeedbackTicketRequest.customerReference) — Zed independently
+         re-checks ViewSearchFeedbackTicketReplayPermissionPlugin against it, the same "Zed is the only
+         trustworthy source of does-this-customer-hold-this-permission" posture GatewayController::
+         submitTicketAction() already uses, rather than trusting the Yves-side check alone. -->
+    <transfer name="SearchFeedbackTicketSrpSnapshotRequest" strict="true">
+        <property name="idSearchFeedbackTicket" type="int"/>
+        <property name="customerReference" type="string"/>
+    </transfer>
+
+    <!-- isFound=false covers both "this ticket has no snapshot" (predates this feature, or the capture
+         plugins weren't wired) and "this ticket id doesn't exist" — ReplayCapableSearch treats both
+         identically: fall through to a live search rather than error. -->
+    <transfer name="SearchFeedbackTicketSrpSnapshotResponse" strict="true">
+        <property name="isFound" type="bool"/>
+        <property name="snapshot" type="SearchFeedbackTicketSrpSnapshot"/>
     </transfer>
 
     <!-- How much of the back office can actually reach this package's Zed pages, for

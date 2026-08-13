@@ -137,6 +137,12 @@ class DetailController extends AbstractController
      * (`StorePrefixRouterEnhancerPlugin`). Returns null (no link rendered) only in the OFF case when the
      * shop hasn't configured a host for the ticket's store — the ON case always has a base URL.
      *
+     * When the ticket has a frozen snapshot, `srpReplayTicket` is appended so the Client-layer
+     * `ReplayCapableSearch` decorator replays it instead of running a live search —
+     * `SearchFeedbackReplayContextEventDispatcherPlugin` is what actually reads this param in Yves and
+     * gates it behind `ViewSearchFeedbackTicketReplayPermissionPlugin`; a ticket with no snapshot gets the
+     * plain live-search link exactly as before this feature existed.
+     *
      * @param \Generated\Shared\Transfer\SearchFeedbackTicketTransfer $ticketTransfer
      */
     protected function buildSearchResultsPageUrl(SearchFeedbackTicketTransfer $ticketTransfer): ?string
@@ -156,7 +162,13 @@ class DetailController extends AbstractController
             return null;
         }
 
-        $queryString = http_build_query($ticketTransfer->getFilters() ?? []);
+        $queryParameters = $ticketTransfer->getFilters() ?? [];
+
+        if ($ticketTransfer->getHasSnapshot()) {
+            $queryParameters[SearchFeedbackConfig::REQUEST_PARAM_SRP_REPLAY_TICKET] = $ticketTransfer->getIdSearchFeedbackTicketOrFail();
+        }
+
+        $queryString = http_build_query($queryParameters);
 
         return sprintf(
             '%s%s%s%s',

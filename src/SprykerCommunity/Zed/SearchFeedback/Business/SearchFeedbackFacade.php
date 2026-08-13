@@ -13,6 +13,7 @@ use Generated\Shared\Transfer\SearchFeedbackTicketCollectionTransfer;
 use Generated\Shared\Transfer\SearchFeedbackTicketMessageRequestTransfer;
 use Generated\Shared\Transfer\SearchFeedbackTicketRequestTransfer;
 use Generated\Shared\Transfer\SearchFeedbackTicketResponseTransfer;
+use Generated\Shared\Transfer\SearchFeedbackTicketSrpSnapshotTransfer;
 use Generated\Shared\Transfer\SearchFeedbackTicketTransfer;
 use Spryker\Zed\Kernel\Business\AbstractFacade;
 
@@ -84,5 +85,17 @@ class SearchFeedbackFacade extends AbstractFacade implements SearchFeedbackFacad
     public function findTicketById(int $idSearchFeedbackTicket): ?SearchFeedbackTicketTransfer
     {
         return $this->getFactory()->createTicketManager()->findTicketById($idSearchFeedbackTicket);
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @api
+     *
+     * @param int $idSearchFeedbackTicket
+     */
+    public function findSrpSnapshotByTicketId(int $idSearchFeedbackTicket): ?SearchFeedbackTicketSrpSnapshotTransfer
+    {
+        return $this->getFactory()->createTicketManager()->findSrpSnapshotByTicketId($idSearchFeedbackTicket);
     }
 }

@@ -11,8 +11,11 @@ namespace SprykerCommunity\Zed\SearchFeedback\Communication\Controller;
 
 use Generated\Shared\Transfer\SearchFeedbackTicketRequestTransfer;
 use Generated\Shared\Transfer\SearchFeedbackTicketResponseTransfer;
+use Generated\Shared\Transfer\SearchFeedbackTicketSrpSnapshotRequestTransfer;
+use Generated\Shared\Transfer\SearchFeedbackTicketSrpSnapshotResponseTransfer;
 use Spryker\Zed\Kernel\Communication\Controller\AbstractGatewayController;
 use SprykerCommunity\Shared\SearchFeedback\Plugin\SubmitSearchFeedbackTicketPermissionPlugin;
+use SprykerCommunity\Shared\SearchFeedback\Plugin\ViewSearchFeedbackTicketReplayPermissionPlugin;
 
 /**
  * @method \SprykerCommunity\Zed\SearchFeedback\Business\SearchFeedbackFacadeInterface getFacade()
@@ -40,5 +43,33 @@ class GatewayController extends AbstractGatewayController
         }
 
         return $this->getFacade()->submitTicket($requestTransfer);
+    }
+
+    /**
+     * Same independent-re-check posture as submitTicketAction() — the Yves-side permission check in
+     * `SearchFeedbackReplayContextEventDispatcherPlugin` is a UX gate (bounce to login early), not the
+     * authorization boundary; this is.
+     *
+     * @param \Generated\Shared\Transfer\SearchFeedbackTicketSrpSnapshotRequestTransfer $requestTransfer
+     */
+    public function getTicketSrpSnapshotAction(SearchFeedbackTicketSrpSnapshotRequestTransfer $requestTransfer): SearchFeedbackTicketSrpSnapshotResponseTransfer
+    {
+        $isAuthorized = $this->getFactory()
+            ->createCompanyUserPermissionAuthorizer()
+            ->isAuthorized($requestTransfer->getCustomerReferenceOrFail(), ViewSearchFeedbackTicketReplayPermissionPlugin::KEY);
+
+        if (!$isAuthorized) {
+            return (new SearchFeedbackTicketSrpSnapshotResponseTransfer())->setIsFound(false);
+        }
+
+        $snapshotTransfer = $this->getFacade()->findSrpSnapshotByTicketId($requestTransfer->getIdSearchFeedbackTicketOrFail());
+
+        if ($snapshotTransfer === null) {
+            return (new SearchFeedbackTicketSrpSnapshotResponseTransfer())->setIsFound(false);
+        }
+
+        return (new SearchFeedbackTicketSrpSnapshotResponseTransfer())
+            ->setIsFound(true)
+            ->setSnapshot($snapshotTransfer);
     }
 }
