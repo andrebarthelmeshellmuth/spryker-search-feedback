@@ -49,3 +49,5 @@ search_feedback.check_installation.permission_denied_body,"This installation-che
 search_feedback.check_installation.permission_denied_body,"Diese Installationsprüfung wird nur einem Kunden mit der Berechtigung SubmitSearchFeedbackTicketPermissionPlugin angezeigt. Vergib sie in Zed → Kunde → Unternehmensrollen an eine Rolle, weise sie deinem Konto zu und lade die Seite neu.",de_DE
 permission.name.SubmitSearchFeedbackTicketPermissionPlugin,Submit search feedback tickets,en_US
 permission.name.SubmitSearchFeedbackTicketPermissionPlugin,Suchfeedback-Tickets einreichen,de_DE
+permission.name.ViewSearchFeedbackTicketReplayPermissionPlugin,View a search feedback ticket's frozen SRP replay,en_US
+permission.name.ViewSearchFeedbackTicketReplayPermissionPlugin,Eingefrorenes SRP-Replay eines Suchfeedback-Tickets ansehen,de_DE

@@ -46,6 +46,16 @@ class SearchFeedbackSnapshotResultFormatterPlugin extends AbstractElasticsearchR
      *   customer beyond an opaque token, so there is nothing that needs gating until the ticket-submit
      *   permission check itself (SubmitSearchFeedbackTicketPermissionPlugin, checked in the Yves
      *   controller, same as today).
+     * - Skips capturing entirely when this request is itself a frozen-replay view
+     *   ({@see \SprykerCommunity\Shared\SearchFeedback\SearchFeedbackConfig::REQUEST_PARAM_SRP_REPLAY_TICKET}
+     *   present in `$requestParameters`, same signal {@see \SprykerCommunity\Client\SearchFeedback\Search\ReplayCapableSearch}
+     *   itself keys off). Two independent reasons: there is nothing new worth freezing while already looking
+     *   at frozen data, and the `$searchResult` in that case wraps a `Query` object
+     *   `ReplayCapableSearch::buildReplayResultSet()` rebuilt via `Query::create($rawArrayFromStorage)` —
+     *   a plain-array reconstruction, not the fluent builder API a live query goes through. Confirmed live:
+     *   Elastica's own `Query::toArray()` throws `Undefined array key "suggest"` on that reconstructed
+     *   object whenever the frozen query DSL includes a suggest block, because `toArray()` expects the
+     *   double-nested shape `setSuggest()` produces and the reconstruction never re-nests it.
      *
      * @param \Elastica\ResultSet $searchResult
      * @param array<string, mixed> $requestParameters
@@ -54,6 +64,12 @@ class SearchFeedbackSnapshotResultFormatterPlugin extends AbstractElasticsearchR
      */
     protected function formatSearchResult(ResultSet $searchResult, array $requestParameters): array
     {
+        if (isset($requestParameters[SearchFeedbackConfig::REQUEST_PARAM_SRP_REPLAY_TICKET])) {
+            return [
+                SearchFeedbackConfig::KEY_SNAPSHOT_TOKEN => null,
+            ];
+        }
+
         $rawResponse = json_encode($searchResult->getResponse()->getData()) ?: '{}';
         $queryDsl = json_encode($searchResult->getQuery()->toArray()) ?: '{}';
         $encodedRequestParameters = $requestParameters === [] ? null : (json_encode($requestParameters) ?: null);

@@ -193,12 +193,41 @@ full conversation thread + reply form + status actions):
     page just re-runs a live search, which is the exact drift this feature exists to close; see
     [What it does](#what-it-does)):
     - Register `SearchFeedbackSnapshotResultFormatterPlugin` in the Client `CatalogDependencyProvider`'s
-      `CATALOG_SEARCH_RESULT_FORMATTER_PLUGINS` list.
+      `CATALOG_SEARCH_RESULT_FORMATTER_PLUGINS` list. **This alone is not enough if your SRP twig template
+      whitelists which controller-returned fields it forwards into `data`** — SprykerShop's own
+      `CatalogPage` search template does exactly that
+      (`{% define data = {...} %}` in `Theme/default/views/search/search.twig`, reading from `_view.*`), and
+      a project that copied/extended that template for other community packages (search-debug's
+      `searchDebugTokens`, search-ranking's `randomImpactIsActive`, …) has to add this package's key the
+      same way:
+      ```twig
+      searchFeedbackSnapshot: _view.searchFeedbackSnapshot | default,
+      ```
+      Confirmed live: without this line the plugin still runs and captures correctly every time (a session
+      entry always appears), but `data.searchFeedbackSnapshot.token` is silently empty in the ticket-form
+      include below — the hidden `snapshotToken` field never renders, every ticket saves with zero snapshot
+      rows, and nothing anywhere errors. This is the single most notorious silent-failure point in this
+      whole step; if `search-feedback:check-installation`'s frozen-replay section is green but tickets still
+      have no snapshot, check this template mapping first.
     - Register `SearchFeedbackReplayContextEventDispatcherPlugin` in the Yves
       `EventDispatcherDependencyProvider::getEventDispatcherPlugins()`.
     - Register `ViewSearchFeedbackTicketReplayPermissionPlugin` in both the Client and Zed
       `PermissionDependencyProvider::getPermissionPlugins()`, and grant it to whichever company role should
       be able to review a replay — same mechanism as step 4, a separate, independently-grantable permission.
+      **A brand-new permission plugin needs one extra step the Company Role GUI won't do for you**: Spryker
+      only knows about a permission plugin once it's been synced into `spy_permission`, and that sync is not
+      automatic on deploy. Visit `/permission/index/sync` in Zed once (or click "Sync permissions" under
+      Maintenance in the sidebar) after registering the plugin. Skipping this doesn't just hide the
+      permission from the grant checkbox — it makes the Company Role edit/create page throw a hard
+      `ErrorException: Undefined array key "ViewSearchFeedbackTicketReplayPermissionPlugin"` for *every*
+      company role, not just ones that would hold this permission, because that page always evaluates every
+      registered permission plugin against `spy_permission`. Confirmed live. This is a generic Spryker
+      gotcha, not specific to this package, but it bites hard the first time a project adds its first
+      community-package permission plugin. Once synced, this package's `data/glossary.csv` already ships
+      the `permission.name.ViewSearchFeedbackTicketReplayPermissionPlugin` label the Company Role GUI needs
+      to render the checkbox (same `permission.name.*` convention `SubmitSearchFeedbackTicketPermissionPlugin`
+      uses, step 4) — re-run `vendor/bin/console data:import glossary` (step 13) if that page instead throws
+      `MissingTranslationException: Could not find a translation for key permission.name....`.
     - Add a project-level `Pyz\Client\SearchElasticsearch\SearchElasticsearchFactory` overriding
       `createSearchClient()` to wrap the real `Search` in `ReplayCapableSearch` — this is the seam that
       actually swaps a live ES call for the frozen snapshot; see the class's own docblock. First
