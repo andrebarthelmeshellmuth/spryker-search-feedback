@@ -29,8 +29,6 @@ interface SearchFeedbackToPermissionFacadeInterface
      * no such landmine.
      *
      * @param string $permissionKey
-     *
-     * @return \Generated\Shared\Transfer\PermissionTransfer|null
      */
     public function findPermissionByKey(string $permissionKey): ?PermissionTransfer;
 }

@@ -148,8 +148,6 @@ class FrozenReplayCest
 
     /**
      * @param string $overlayText
-     *
-     * @return string|null
      */
     protected static function extractRelevanceWeight(string $overlayText): ?string
     {

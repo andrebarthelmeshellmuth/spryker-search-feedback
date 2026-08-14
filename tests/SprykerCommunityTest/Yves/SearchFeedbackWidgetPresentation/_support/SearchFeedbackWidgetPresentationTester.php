@@ -128,8 +128,6 @@ class SearchFeedbackWidgetPresentationTester extends Actor
      * @param string $customerReference
      *
      * @throws \Exception
-     *
-     * @return int
      */
     public function grabLatestSearchFeedbackTicketIdForCustomerReference(string $customerReference): int
     {
