@@ -466,9 +466,11 @@ class SearchFeedbackCheckInstallationConsole extends Console
         foreach (static::SNAPSHOT_LONGTEXT_COLUMN_NAMES as $columnName) {
             $columnType = $columnTypesByName[$columnName] ?? null;
 
-            if ($columnType !== null && !str_starts_with($columnType, 'longtext')) {
-                $badColumnNames[$columnName] = $columnType;
+            if ($columnType === null || str_starts_with($columnType, 'longtext')) {
+                continue;
             }
+
+            $badColumnNames[$columnName] = $columnType;
         }
 
         if ($badColumnNames === []) {
@@ -531,9 +533,11 @@ class SearchFeedbackCheckInstallationConsole extends Console
         $unsyncedPermissionKeys = [];
 
         foreach (static::PERMISSION_KEYS as $permissionKey) {
-            if ($this->getPermissionFacade()->findPermissionByKey($permissionKey) === null) {
-                $unsyncedPermissionKeys[] = $permissionKey;
+            if ($this->getPermissionFacade()->findPermissionByKey($permissionKey) !== null) {
+                continue;
             }
+
+            $unsyncedPermissionKeys[] = $permissionKey;
         }
 
         if ($unsyncedPermissionKeys === []) {
