@@ -97,7 +97,19 @@ full conversation thread + reply form + status actions):
 
 ## Installation
 
-1. `composer require spryker-community/search-feedback`
+1. Not published on Packagist under the `spryker-community` vendor namespace — install from a VCS
+   repository instead:
+   ```json
+   "repositories": [
+       {
+           "type": "vcs",
+           "url": "https://github.com/andrebarthelmeshellmuth/spryker-search-feedback"
+       }
+   ]
+   ```
+   ```bash
+   composer require spryker-community/search-feedback:^1.4
+   ```
 2. Register the `SprykerCommunity` core namespace: add it to `KernelConstants::CORE_NAMESPACES` in
    `config/Shared/config_default.php`. Spryker's `ClassResolver` only ever looks in the project namespace
    plus whatever's listed here — miss this and every class in the package fails to resolve, most visibly as
