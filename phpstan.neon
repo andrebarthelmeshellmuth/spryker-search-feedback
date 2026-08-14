@@ -18,3 +18,23 @@ parameters:
             message: '#Call to an undefined method Spryker\\Service\\Container\\ContainerInterface\|Spryker\\Yves\\Kernel\\Application::get\(\)\.#'
             path: src/SprykerCommunity/Yves/SearchFeedbackWidget/Controller/CheckInstallationController.php
             count: 1
+        -
+            # getSearchRankingClient()'s return type is deliberately bare `object` (see its own docblock) —
+            # this package cannot type-hint the sibling search-ranking package's own client class without
+            # making the whole file fail to autoload in a project that hasn't installed it. The one caller,
+            # checkSearchRankingSpecificityIntegration(), only ever calls this after isSearchRankingInstalled()
+            # confirms the interface exists, so the method really is callable at runtime — PHPStan just can't
+            # see across that runtime guard.
+            message: '#Call to an undefined method object::isSpecificityWeightingEnabled\(\)\.#'
+            path: src/SprykerCommunity/Yves/SearchFeedbackWidget/Controller/CheckInstallationController.php
+            count: 1
+        -
+            # Spryker\Yves\Kernel\Locator resolves bundle proxies (->permission(), ->searchFeedback(),
+            # ->searchRanking()) through __call() at runtime — PHPStan cannot see through that regardless
+            # of the generated Ide\AutoCompletion stub (confirmed: searchFeedback()/searchRanking() ARE
+            # listed there, and PHPStan still flags the call, so it isn't consulting that stub as a mixin
+            # for this class). Same idiom as PermissionAwareTrait::can() itself, which makes the identical
+            # call unguarded.
+            message: '#Call to an undefined method Spryker\\Yves\\Kernel\\Locator::(permission|searchFeedback|searchRanking)\(\)\.#'
+            path: src/SprykerCommunity/Yves/SearchFeedbackWidget/Controller/CheckInstallationController.php
+            count: 3

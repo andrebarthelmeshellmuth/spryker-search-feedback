@@ -54,4 +54,16 @@ interface SearchFeedbackClientInterface
      * @param string $token
      */
     public function consumeSnapshot(string $token): ?SearchFeedbackTicketSrpSnapshotTransfer;
+
+    /**
+     * Specification:
+     * - Whether at least one TermVectorSnapshotProviderPluginInterface implementation is registered via
+     *   SearchFeedbackDependencyProvider::getTermVectorSnapshotProviderPlugins() — an optional integration
+     *   point, most commonly wired to search-ranking's own SearchFeedbackTermVectorSnapshotProviderPlugin
+     *   (see README step 11). Exists so a caller outside this module (the Yves check-installation page)
+     *   can verify the registration without reaching into the Factory directly.
+     *
+     * @api
+     */
+    public function hasTermVectorSnapshotProviderPlugin(): bool;
 }

@@ -71,4 +71,14 @@ class SearchFeedbackClient extends AbstractClient implements SearchFeedbackClien
             ->setHasTermVectorSnapshot($snapshot['hasTermVectorSnapshot'])
             ->setTermVectorSnapshot($snapshot['termVectorSnapshot']);
     }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @api
+     */
+    public function hasTermVectorSnapshotProviderPlugin(): bool
+    {
+        return $this->getFactory()->getTermVectorSnapshotProviderPlugins() !== [];
+    }
 }

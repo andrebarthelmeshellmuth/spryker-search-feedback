@@ -11,11 +11,16 @@ namespace SprykerCommunityTest\Yves\SearchFeedbackWidget\Controller;
 
 use Closure;
 use Codeception\Test\Unit;
+use Generated\Shared\Transfer\PermissionCollectionTransfer;
+use Generated\Shared\Transfer\PermissionTransfer;
 use ReflectionMethod;
+use Spryker\Client\Permission\PermissionClientInterface;
 use Spryker\Service\Container\ContainerInterface;
 use Spryker\Shared\EventDispatcher\EventDispatcher;
 use Spryker\Yves\Kernel\View\View;
+use SprykerCommunity\Client\SearchFeedback\SearchFeedbackClientInterface;
 use SprykerCommunity\Shared\SearchFeedback\Plugin\SubmitSearchFeedbackTicketPermissionPlugin;
+use SprykerCommunity\Shared\SearchFeedback\Plugin\ViewSearchFeedbackTicketReplayPermissionPlugin;
 use SprykerCommunity\Yves\SearchFeedbackWidget\Controller\CheckInstallationController;
 use SprykerCommunity\Yves\SearchFeedbackWidget\Plugin\EventDispatcher\SearchFeedbackReplayContextEventDispatcherPlugin;
 use SprykerCommunity\Yves\SearchFeedbackWidget\Plugin\Router\SearchFeedbackWidgetRouteProviderPlugin;
@@ -96,10 +101,10 @@ class CheckInstallationControllerTest extends Unit
         $this->assertSame('@SearchFeedbackWidget/views/check-installation/check-installation.twig', $result->getTemplate());
     }
 
-    public function testRunChecksReturnsAllThreeChecksInOrder(): void
+    public function testRunChecksReturnsAllFiveChecksInOrder(): void
     {
-        // Arrange — a container that passes every individual check, so the only thing under test here is
-        // that all three run and land in the right order.
+        // Arrange — a container plus stubbed getters that pass every individual check, so the only thing
+        // under test here is that all five run and land in the right order.
         $twig = new Environment(new ArrayLoader());
         $twig->addFunction(new TwigFunction(SearchFeedbackWidgetTwigPlugin::FUNCTION_NAME_CAN_SUBMIT_TICKET, fn () => true));
         $twig->addFunction(new TwigFunction(SearchFeedbackWidgetTwigPlugin::FUNCTION_NAME_TICKET_CSRF_TOKEN, fn () => ''));
@@ -109,14 +114,28 @@ class CheckInstallationControllerTest extends Unit
         $router = $this->createMock(ChainRouterInterface::class);
         $router->method('generate')->willReturn('/some/url');
 
+        $permissionClientMock = $this->createMock(PermissionClientInterface::class);
+        $permissionClientMock->method('getRegisteredPermissions')->willReturn(
+            (new PermissionCollectionTransfer())->addPermission((new PermissionTransfer())->setKey(ViewSearchFeedbackTicketReplayPermissionPlugin::KEY)),
+        );
+
+        $controller = $this->getMockBuilder(CheckInstallationController::class)
+            ->onlyMethods(['getPermissionClient', 'isSearchRankingInstalled'])
+            ->getMock();
+        $controller->method('getPermissionClient')->willReturn($permissionClientMock);
+        $controller->method('isSearchRankingInstalled')->willReturn(false);
+        $controller->setApplication($this->createContainer($twig, $dispatcher, $router));
+
         // Act
-        $checks = $this->invokeProtectedMethod('runChecks', [], $this->createContainer($twig, $dispatcher, $router));
+        $checks = $this->invokeProtectedMethodOn($controller, 'runChecks');
 
         // Assert
-        $this->assertCount(3, $checks);
+        $this->assertCount(5, $checks);
         $this->assertTrue($checks[0]['passed']);
         $this->assertTrue($checks[1]['passed']);
         $this->assertTrue($checks[2]['passed']);
+        $this->assertTrue($checks[3]['passed']);
+        $this->assertTrue($checks[4]['passed']);
     }
 
     public function testCheckTwigFunctionsReturnsPassedWhenAllThreeAreRegistered(): void
@@ -264,6 +283,154 @@ class CheckInstallationControllerTest extends Unit
         // Assert
         $this->assertFalse($check['passed']);
         $this->assertStringContainsString('EventDispatcherDependencyProvider.php', $check['remedy']);
+    }
+
+    public function testCheckReplayPermissionRegisteredReturnsPassedWhenTheKeyIsInTheRegisteredCollection(): void
+    {
+        // Arrange
+        $permissionCollection = (new PermissionCollectionTransfer())
+            ->addPermission((new PermissionTransfer())->setKey(ViewSearchFeedbackTicketReplayPermissionPlugin::KEY))
+            ->addPermission((new PermissionTransfer())->setKey('SomeOtherPermissionPlugin'));
+        $permissionClientMock = $this->createMock(PermissionClientInterface::class);
+        $permissionClientMock->method('getRegisteredPermissions')->willReturn($permissionCollection);
+
+        $controller = $this->getMockBuilder(CheckInstallationController::class)
+            ->onlyMethods(['getPermissionClient'])
+            ->getMock();
+        $controller->method('getPermissionClient')->willReturn($permissionClientMock);
+
+        // Act
+        $check = $this->invokeProtectedMethodOn($controller, 'checkReplayPermissionRegistered');
+
+        // Assert
+        $this->assertTrue($check['passed']);
+        $this->assertNull($check['remedy']);
+    }
+
+    public function testCheckReplayPermissionRegisteredReturnsFailedWithARemedyWhenTheKeyIsMissing(): void
+    {
+        // Arrange
+        $permissionClientMock = $this->createMock(PermissionClientInterface::class);
+        $permissionClientMock->method('getRegisteredPermissions')->willReturn(
+            (new PermissionCollectionTransfer())->addPermission((new PermissionTransfer())->setKey('SomeOtherPermissionPlugin')),
+        );
+
+        $controller = $this->getMockBuilder(CheckInstallationController::class)
+            ->onlyMethods(['getPermissionClient'])
+            ->getMock();
+        $controller->method('getPermissionClient')->willReturn($permissionClientMock);
+
+        // Act
+        $check = $this->invokeProtectedMethodOn($controller, 'checkReplayPermissionRegistered');
+
+        // Assert
+        $this->assertFalse($check['passed']);
+        $this->assertStringContainsString('PermissionDependencyProvider.php', $check['remedy']);
+    }
+
+    public function testCheckSearchRankingSpecificityIntegrationPassesTriviallyWhenSearchRankingIsNotInstalled(): void
+    {
+        // Arrange
+        $controller = $this->getMockBuilder(CheckInstallationController::class)
+            ->onlyMethods(['isSearchRankingInstalled'])
+            ->getMock();
+        $controller->method('isSearchRankingInstalled')->willReturn(false);
+
+        // Act
+        $check = $this->invokeProtectedMethodOn($controller, 'checkSearchRankingSpecificityIntegration');
+
+        // Assert
+        $this->assertTrue($check['passed']);
+        $this->assertNull($check['remedy']);
+    }
+
+    public function testCheckSearchRankingSpecificityIntegrationPassesWhenBothTheProviderPluginAndTheWeightingFlagAreOn(): void
+    {
+        // Arrange
+        $controller = $this->buildControllerMockForSpecificityIntegration(true, true);
+
+        // Act
+        $check = $this->invokeProtectedMethodOn($controller, 'checkSearchRankingSpecificityIntegration');
+
+        // Assert
+        $this->assertTrue($check['passed']);
+        $this->assertNull($check['remedy']);
+    }
+
+    public function testCheckSearchRankingSpecificityIntegrationFailsWithARemedyWhenTheProviderPluginIsNotRegistered(): void
+    {
+        // Arrange
+        $controller = $this->buildControllerMockForSpecificityIntegration(false, true);
+
+        // Act
+        $check = $this->invokeProtectedMethodOn($controller, 'checkSearchRankingSpecificityIntegration');
+
+        // Assert
+        $this->assertFalse($check['passed']);
+        $this->assertStringContainsString('SearchFeedbackDependencyProvider.php', $check['remedy']);
+    }
+
+    public function testCheckSearchRankingSpecificityIntegrationFailsWithARemedyWhenSpecificityWeightingIsOff(): void
+    {
+        // Arrange
+        $controller = $this->buildControllerMockForSpecificityIntegration(true, false);
+
+        // Act
+        $check = $this->invokeProtectedMethodOn($controller, 'checkSearchRankingSpecificityIntegration');
+
+        // Assert
+        $this->assertFalse($check['passed']);
+        $this->assertStringContainsString('isSpecificityWeightingEnabled', $check['remedy']);
+    }
+
+    /**
+     * @return \SprykerCommunity\Yves\SearchFeedbackWidget\Controller\CheckInstallationController|\PHPUnit\Framework\MockObject\MockObject
+     */
+    protected function buildControllerMockForSpecificityIntegration(bool $hasProviderPlugin, bool $isSpecificityWeightingEnabled): CheckInstallationController
+    {
+        $searchFeedbackClientMock = $this->createMock(SearchFeedbackClientInterface::class);
+        $searchFeedbackClientMock->method('hasTermVectorSnapshotProviderPlugin')->willReturn($hasProviderPlugin);
+
+        // Stand-in for search-ranking's own Client, which this package cannot type-hint directly (see
+        // getSearchRankingClient()'s own docblock) — a real mock needs a real class/interface to mock
+        // against, so a tiny anonymous class fills in instead.
+        $searchRankingClientMock = new class ($isSpecificityWeightingEnabled) {
+            public function __construct(protected bool $isSpecificityWeightingEnabled)
+            {
+            }
+
+            public function isSpecificityWeightingEnabled(): bool
+            {
+                return $this->isSpecificityWeightingEnabled;
+            }
+        };
+
+        $controller = $this->getMockBuilder(CheckInstallationController::class)
+            ->onlyMethods(['isSearchRankingInstalled', 'getSearchFeedbackClient', 'getSearchRankingClient'])
+            ->getMock();
+        $controller->method('isSearchRankingInstalled')->willReturn(true);
+        $controller->method('getSearchFeedbackClient')->willReturn($searchFeedbackClientMock);
+        $controller->method('getSearchRankingClient')->willReturn($searchRankingClientMock);
+
+        return $controller;
+    }
+
+    /**
+     * Same purpose as {@see invokeProtectedMethod()}, but invokes on an already-built controller (a mock
+     * with specific getters stubbed) instead of always constructing a bare `new CheckInstallationController()`
+     * — needed for the checks added above, which reach `Locator::getInstance()` through small overridable
+     * getter methods rather than through `getApplication()->get($id)`.
+     *
+     * @param object $controller
+     * @param string $methodName
+     *
+     * @return mixed
+     */
+    protected function invokeProtectedMethodOn(object $controller, string $methodName)
+    {
+        $reflectionMethod = new ReflectionMethod(CheckInstallationController::class, $methodName);
+
+        return $reflectionMethod->invoke($controller);
     }
 
     public function testIsListenerBoundReturnsTrueWhenThePluginRegisteredAListenerForTheEvent(): void
