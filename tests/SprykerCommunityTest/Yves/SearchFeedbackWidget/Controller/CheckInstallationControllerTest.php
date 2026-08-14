@@ -101,10 +101,10 @@ class CheckInstallationControllerTest extends Unit
         $this->assertSame('@SearchFeedbackWidget/views/check-installation/check-installation.twig', $result->getTemplate());
     }
 
-    public function testRunChecksReturnsAllFiveChecksInOrder(): void
+    public function testRunChecksReturnsAllSixChecksInOrder(): void
     {
         // Arrange — a container plus stubbed getters that pass every individual check, so the only thing
-        // under test here is that all five run and land in the right order.
+        // under test here is that all six run and land in the right order.
         $twig = new Environment(new ArrayLoader());
         $twig->addFunction(new TwigFunction(SearchFeedbackWidgetTwigPlugin::FUNCTION_NAME_CAN_SUBMIT_TICKET, fn () => true));
         $twig->addFunction(new TwigFunction(SearchFeedbackWidgetTwigPlugin::FUNCTION_NAME_TICKET_CSRF_TOKEN, fn () => ''));
@@ -120,22 +120,24 @@ class CheckInstallationControllerTest extends Unit
         );
 
         $controller = $this->getMockBuilder(CheckInstallationController::class)
-            ->onlyMethods(['getPermissionClient', 'isSearchRankingInstalled'])
+            ->onlyMethods(['getPermissionClient', 'isSearchRankingInstalled', 'getSearchResultsTemplateFilePath'])
             ->getMock();
         $controller->method('getPermissionClient')->willReturn($permissionClientMock);
         $controller->method('isSearchRankingInstalled')->willReturn(false);
+        $controller->method('getSearchResultsTemplateFilePath')->willReturn('/does/not/exist.twig');
         $controller->setApplication($this->createContainer($twig, $dispatcher, $router));
 
         // Act
         $checks = $this->invokeProtectedMethodOn($controller, 'runChecks');
 
         // Assert
-        $this->assertCount(5, $checks);
+        $this->assertCount(6, $checks);
         $this->assertTrue($checks[0]['passed']);
         $this->assertTrue($checks[1]['passed']);
         $this->assertTrue($checks[2]['passed']);
         $this->assertTrue($checks[3]['passed']);
         $this->assertTrue($checks[4]['passed']);
+        $this->assertTrue($checks[5]['passed']);
     }
 
     public function testCheckTwigFunctionsReturnsPassedWhenAllThreeAreRegistered(): void
@@ -381,6 +383,84 @@ class CheckInstallationControllerTest extends Unit
         // Assert
         $this->assertFalse($check['passed']);
         $this->assertStringContainsString('isSpecificityWeightingEnabled', $check['remedy']);
+    }
+
+    public function testCheckSearchResultsTemplateMappingReturnsPassedWhenTheMappingIsPresent(): void
+    {
+        // Arrange
+        $templateFilePath = $this->createTemplateFixtureFile("{% define data = {\n    searchFeedbackSnapshot: _view.searchFeedbackSnapshot | default,\n} %}");
+        $controller = $this->getMockBuilder(CheckInstallationController::class)
+            ->onlyMethods(['getSearchResultsTemplateFilePath'])
+            ->getMock();
+        $controller->method('getSearchResultsTemplateFilePath')->willReturn($templateFilePath);
+
+        try {
+            // Act
+            $check = $this->invokeProtectedMethodOn($controller, 'checkSearchResultsTemplateMapping');
+
+            // Assert
+            $this->assertTrue($check['passed']);
+            $this->assertNull($check['remedy']);
+        } finally {
+            unlink($templateFilePath);
+        }
+    }
+
+    /**
+     * The exact real-world shape confirmed live: the template maps OTHER packages' keys (search-debug's
+     * `searchDebugTokens`) just fine, but never adds this package's own `searchFeedbackSnapshot` — a
+     * missing mapping never errors, it just leaves `data.searchFeedbackSnapshot` undefined.
+     */
+    public function testCheckSearchResultsTemplateMappingReturnsFailedWithARemedyWhenTheMappingIsMissing(): void
+    {
+        // Arrange
+        $templateFilePath = $this->createTemplateFixtureFile("{% define data = {\n    searchDebugTokens: _view.searchDebug.tokens | default([]),\n} %}");
+        $controller = $this->getMockBuilder(CheckInstallationController::class)
+            ->onlyMethods(['getSearchResultsTemplateFilePath'])
+            ->getMock();
+        $controller->method('getSearchResultsTemplateFilePath')->willReturn($templateFilePath);
+
+        try {
+            // Act
+            $check = $this->invokeProtectedMethodOn($controller, 'checkSearchResultsTemplateMapping');
+
+            // Assert
+            $this->assertFalse($check['passed']);
+            $this->assertStringContainsString('searchFeedbackSnapshot', $check['remedy']);
+            $this->assertStringContainsString('search.twig', $check['remedy']);
+        } finally {
+            unlink($templateFilePath);
+        }
+    }
+
+    /**
+     * A project that doesn't use SprykerShop's CatalogPage search template at all (a fully custom SRP) has
+     * no file to check — indistinguishable from "forgot the mapping" from outside, so this errs toward not
+     * crying wolf rather than failing on a state it cannot actually diagnose.
+     */
+    public function testCheckSearchResultsTemplateMappingReturnsPassedWhenTheTemplateFileDoesNotExist(): void
+    {
+        // Arrange
+        $controller = $this->getMockBuilder(CheckInstallationController::class)
+            ->onlyMethods(['getSearchResultsTemplateFilePath'])
+            ->getMock();
+        $controller->method('getSearchResultsTemplateFilePath')->willReturn('/does/not/exist-' . uniqid() . '.twig');
+
+        // Act
+        $check = $this->invokeProtectedMethodOn($controller, 'checkSearchResultsTemplateMapping');
+
+        // Assert
+        $this->assertTrue($check['passed']);
+        $this->assertNull($check['remedy']);
+    }
+
+    protected function createTemplateFixtureFile(string $contents): string
+    {
+        $templateFilePath = tempnam(sys_get_temp_dir(), 'search-results-template-fixture-');
+
+        file_put_contents($templateFilePath, $contents);
+
+        return $templateFilePath;
     }
 
     protected function buildControllerMockForSpecificityIntegration(bool $hasProviderPlugin, bool $isSpecificityWeightingEnabled): CheckInstallationController

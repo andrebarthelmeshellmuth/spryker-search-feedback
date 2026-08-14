@@ -315,6 +315,26 @@ full conversation thread + reply form + status actions):
     DependencyProvider registration in this file; the Yves `EventDispatcherDependencyProvider` entry for
     that same step is covered by the Yves counterpart below instead.
 
+    Three more checks, added after real bugs surfaced during this feature's first live end-to-end
+    verification:
+    - **Snapshot column types.** A real DB round trip confirming `raw_response`/`query_dsl`/
+      `request_parameters`/`term_vector_snapshot` on `spy_search_feedback_ticket_srp_snapshot` are actually
+      `LONGTEXT`, not plain `TEXT`. Catches a project that installed this package from before the
+      `LONGVARCHAR`→`CLOB` schema fix and never re-migrated — a real captured Elasticsearch response
+      routinely exceeds `TEXT`'s 64KB cap, and the truncation only surfaces as a 500 on ticket submission,
+      not at install time. Warning, not a failure — same "optional feature" posture as the rest of step 11.
+    - **Permission sync.** Confirms `SubmitSearchFeedbackTicketPermissionPlugin` and
+      `ViewSearchFeedbackTicketReplayPermissionPlugin` are actually synced into `spy_permission` (a real DB
+      lookup, not just class-loadable). A permission plugin being registered in
+      `PermissionDependencyProvider` does not mean Spryker knows about it — that needs a one-time
+      `/permission/index/sync` visit in Zed (see step 11 above), and skipping it doesn't just hide the
+      grant checkbox, it throws a hard error on the Company Role create/edit page for *every* role, not
+      just ones that would hold the permission. Confirmed live.
+    - **Search-results template mapping**, on the Yves counterpart below: confirms the project's
+      `src/Pyz/Yves/CatalogPage/Theme/default/views/search/search.twig` actually maps
+      `searchFeedbackSnapshot: _view.searchFeedbackSnapshot` into `data` — the single most notorious
+      silent-failure point in step 11, confirmed live (see step 11 above for the full explanation).
+
     Register it in `src/Pyz/Zed/Console/ConsoleDependencyProvider.php`:
     ```php
     use SprykerCommunity\Zed\SearchFeedback\Communication\Console\SearchFeedbackCheckInstallationConsole;
@@ -335,6 +355,12 @@ full conversation thread + reply form + status actions):
     whether `SearchFeedbackReplayContextEventDispatcherPlugin` is registered as a `KernelEvents::REQUEST`
     listener — miss it and a replay link is never gated by the view-replay permission at the Yves layer
     (the Zed gateway still re-checks authorization independently, so this is a UX gap, not a security hole).
+    It also checks whether `ViewSearchFeedbackTicketReplayPermissionPlugin` is registered on the Client, and
+    whether the optional search-ranking specificity integration is wired up and enabled. And it checks
+    whether the project's search-results template actually maps `searchFeedbackSnapshot` into `data` (see
+    step 11 above) — the single most notorious silent-failure point in the whole frozen-replay feature,
+    confirmed live: without it, the formatter still captures correctly every time, but the ticket form's
+    hidden `snapshotToken` field silently stays empty and no ticket ever gets a frozen-replay snapshot.
     It is complementary, not a replacement: it does not re-check the core namespace, plugin class
     loadability, or the ticket table — run the console command for those.
 

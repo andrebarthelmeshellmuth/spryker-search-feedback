@@ -11,11 +11,15 @@ namespace SprykerCommunityTest\Zed\SearchFeedback\Communication\Console;
 
 use ArrayObject;
 use Codeception\Test\Unit;
+use Generated\Shared\Transfer\PermissionTransfer;
 use Generated\Shared\Transfer\SearchFeedbackTicketCollectionTransfer;
 use Generated\Shared\Transfer\SearchFeedbackTicketTransfer;
 use RuntimeException;
+use SprykerCommunity\Shared\SearchFeedback\Plugin\SubmitSearchFeedbackTicketPermissionPlugin;
+use SprykerCommunity\Shared\SearchFeedback\Plugin\ViewSearchFeedbackTicketReplayPermissionPlugin;
 use SprykerCommunity\Zed\SearchFeedback\Business\SearchFeedbackFacade;
 use SprykerCommunity\Zed\SearchFeedback\Communication\Console\SearchFeedbackCheckInstallationConsole;
+use SprykerCommunity\Zed\SearchFeedback\Dependency\Facade\SearchFeedbackToPermissionFacadeInterface;
 use Symfony\Component\Console\Application;
 use Symfony\Component\Console\Tester\CommandTester;
 
@@ -134,6 +138,96 @@ class SearchFeedbackCheckInstallationConsoleTest extends Unit
         }
     }
 
+    /**
+     * The exact real-world state confirmed live: a project installed this package from before the
+     * LONGVARCHAR->CLOB schema fix, so `raw_response` is plain MySQL TEXT (a 64KB cap) instead of
+     * LONGTEXT — silently truncates a real captured Elasticsearch response on ticket submission. Optional
+     * feature (frozen replay), so a WARNING, not a failure, same posture as the other frozen-replay checks.
+     */
+    public function testWarnsWhenASnapshotColumnIsNotLongtext(): void
+    {
+        // Arrange
+        $commandTester = $this->createCommandTesterWithColumnTypes([
+            'raw_response' => 'text',
+            'query_dsl' => 'longtext',
+            'request_parameters' => 'longtext',
+            'term_vector_snapshot' => 'longtext',
+        ]);
+
+        // Act
+        $exitCode = $commandTester->execute([]);
+
+        // Assert
+        $this->assertSame(SearchFeedbackCheckInstallationConsole::CODE_SUCCESS, $exitCode);
+        $this->assertStringContainsString('raw_response (text)', $commandTester->getDisplay());
+        $this->assertStringContainsString('propel:diff', $commandTester->getDisplay());
+        $this->assertStringContainsString('propel:migrate', $commandTester->getDisplay());
+    }
+
+    public function testSucceedsWithoutWarningWhenAllSnapshotColumnsAreLongtext(): void
+    {
+        // Arrange
+        $commandTester = $this->createCommandTesterWithColumnTypes([
+            'raw_response' => 'longtext',
+            'query_dsl' => 'longtext',
+            'request_parameters' => 'longtext',
+            'term_vector_snapshot' => 'longtext',
+        ]);
+
+        // Act
+        $exitCode = $commandTester->execute([]);
+
+        // Assert
+        $this->assertSame(SearchFeedbackCheckInstallationConsole::CODE_SUCCESS, $exitCode);
+        $this->assertStringContainsString('JSON-blob columns are LONGTEXT', $commandTester->getDisplay());
+    }
+
+    /**
+     * The exact real-world state confirmed live: a permission plugin registered in
+     * `Pyz\{Client,Zed}\Permission\PermissionDependencyProvider` but never synced into `spy_permission` via
+     * `/permission/index/sync` — the Company Role GUI throws a hard error for every company role until this
+     * is done, not just a missing checkbox. Optional feature, so a warning, not a failure.
+     */
+    public function testWarnsWhenAPermissionPluginIsNotSyncedIntoSpyPermission(): void
+    {
+        // Arrange
+        $permissionFacadeMock = $this->createMock(SearchFeedbackToPermissionFacadeInterface::class);
+        $permissionFacadeMock->method('findPermissionByKey')->willReturnCallback(
+            fn (string $key): ?PermissionTransfer => $key === ViewSearchFeedbackTicketReplayPermissionPlugin::KEY
+                ? null
+                : (new PermissionTransfer())->setKey($key),
+        );
+
+        $commandTester = $this->createCommandTesterWithPermissionFacade($permissionFacadeMock);
+
+        // Act
+        $exitCode = $commandTester->execute([]);
+
+        // Assert
+        $this->assertSame(SearchFeedbackCheckInstallationConsole::CODE_SUCCESS, $exitCode);
+        $this->assertStringContainsString(ViewSearchFeedbackTicketReplayPermissionPlugin::KEY, $commandTester->getDisplay());
+        $this->assertStringContainsString('/permission/index/sync', $commandTester->getDisplay());
+        $this->assertStringNotContainsString(SubmitSearchFeedbackTicketPermissionPlugin::KEY . ' are registered', $commandTester->getDisplay());
+    }
+
+    public function testSucceedsWithoutWarningWhenAllPermissionPluginsAreSynced(): void
+    {
+        // Arrange
+        $permissionFacadeMock = $this->createMock(SearchFeedbackToPermissionFacadeInterface::class);
+        $permissionFacadeMock->method('findPermissionByKey')->willReturnCallback(
+            fn (string $key): PermissionTransfer => (new PermissionTransfer())->setKey($key),
+        );
+
+        $commandTester = $this->createCommandTesterWithPermissionFacade($permissionFacadeMock);
+
+        // Act
+        $exitCode = $commandTester->execute([]);
+
+        // Assert
+        $this->assertSame(SearchFeedbackCheckInstallationConsole::CODE_SUCCESS, $exitCode);
+        $this->assertStringContainsString('permission plugin(s) are synced into spy_permission', $commandTester->getDisplay());
+    }
+
     public function testFailsAndNamesTheRemedyWhenTheTicketTableIsUnreachable(): void
     {
         // Arrange
@@ -235,6 +329,82 @@ class SearchFeedbackCheckInstallationConsoleTest extends Unit
             protected function getSearchElasticsearchFactoryOverrideFilePath(): string
             {
                 return $this->overrideFilePath;
+            }
+        };
+        $console->setFacade($facadeMock);
+
+        $application = new Application();
+        $application->add($console);
+
+        $command = $application->find(SearchFeedbackCheckInstallationConsole::COMMAND_NAME);
+
+        return new CommandTester($command);
+    }
+
+    /**
+     * A real ticket collection and application/command wiring, same as {@see createCommandTester()}, but
+     * with an anonymous subclass overriding
+     * {@see SearchFeedbackCheckInstallationConsole::readSnapshotColumnTypes()} so the column-type check
+     * reads the given fixture data instead of this host shop's real database.
+     *
+     * @param array<string, string> $columnTypesByName
+     */
+    protected function createCommandTesterWithColumnTypes(array $columnTypesByName): CommandTester
+    {
+        $facadeMock = $this->getMockBuilder(SearchFeedbackFacade::class)
+            ->onlyMethods(['getTicketCollection'])
+            ->getMock();
+        $facadeMock->method('getTicketCollection')->willReturn($this->createTicketCollection(1));
+
+        $console = new class ($columnTypesByName) extends SearchFeedbackCheckInstallationConsole {
+            /**
+             * @param array<string, string> $columnTypesByName
+             */
+            public function __construct(protected array $columnTypesByName)
+            {
+                parent::__construct();
+            }
+
+            /**
+             * @return array<string, string>
+             */
+            protected function readSnapshotColumnTypes(): array
+            {
+                return $this->columnTypesByName;
+            }
+        };
+        $console->setFacade($facadeMock);
+
+        $application = new Application();
+        $application->add($console);
+
+        $command = $application->find(SearchFeedbackCheckInstallationConsole::COMMAND_NAME);
+
+        return new CommandTester($command);
+    }
+
+    /**
+     * A real ticket collection and application/command wiring, same as {@see createCommandTester()}, but
+     * with an anonymous subclass overriding
+     * {@see SearchFeedbackCheckInstallationConsole::getPermissionFacade()} so the permission-sync check
+     * reads the given fixture instead of this host shop's real Permission facade.
+     */
+    protected function createCommandTesterWithPermissionFacade(SearchFeedbackToPermissionFacadeInterface $permissionFacade): CommandTester
+    {
+        $facadeMock = $this->getMockBuilder(SearchFeedbackFacade::class)
+            ->onlyMethods(['getTicketCollection'])
+            ->getMock();
+        $facadeMock->method('getTicketCollection')->willReturn($this->createTicketCollection(1));
+
+        $console = new class ($permissionFacade) extends SearchFeedbackCheckInstallationConsole {
+            public function __construct(protected SearchFeedbackToPermissionFacadeInterface $permissionFacade)
+            {
+                parent::__construct();
+            }
+
+            protected function getPermissionFacade(): SearchFeedbackToPermissionFacadeInterface
+            {
+                return $this->permissionFacade;
             }
         };
         $console->setFacade($facadeMock);

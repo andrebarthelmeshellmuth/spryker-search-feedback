@@ -47,13 +47,15 @@ use Twig\Error\SyntaxError;
  * {@see \SprykerCommunity\Yves\SearchDebugWidget\Controller\CheckInstallationController}.
  *
  * Of README step 11's five frozen-replay sub-registrations, this page plus the Zed console command
- * together verify four. The one still NOT checked anywhere: `SearchFeedbackSnapshotResultFormatterPlugin`
- * in the Client `CatalogDependencyProvider::CATALOG_SEARCH_RESULT_FORMATTER_PLUGINS` list. Unlike the
- * checks below, that one lives inside `spryker/catalog`'s own internal formatter-plugin collection —
- * this package doesn't own that structure the way it owns its own event listener or permission plugin,
- * so reflecting into it would be reaching into core internals rather than this package's own classes.
- * Confirm it by hand: submit a ticket, then check its Zed detail page's "View SRP" replays the frozen
- * snapshot instead of silently re-running a live search.
+ * together verify four directly. The fifth, `SearchFeedbackSnapshotResultFormatterPlugin` in the Client
+ * `CatalogDependencyProvider::CATALOG_SEARCH_RESULT_FORMATTER_PLUGINS` list, cannot be checked directly —
+ * it lives inside `spryker/catalog`'s own internal formatter-plugin collection, not this package's own
+ * classes, so reflecting into it would be reaching into core internals. {@see checkSearchResultsTemplateMapping()}
+ * catches the actual silent-failure SYMPTOM that registration gap produces instead (confirmed live): even
+ * with the formatter correctly registered and capturing every search, the search-results template can
+ * still fail to forward the captured token into `data`, which looks identical from the outside. Confirm
+ * the formatter registration itself by hand: submit a ticket, then check its Zed detail page's "View SRP"
+ * replays the frozen snapshot instead of silently re-running a live search.
  *
  * @method \SprykerCommunity\Yves\SearchFeedbackWidget\SearchFeedbackWidgetFactory getFactory()
  */
@@ -67,6 +69,23 @@ class CheckInstallationController extends AbstractController
      * @var string
      */
     protected const SERVICE_DISPATCHER = 'dispatcher';
+
+    /**
+     * SprykerShop's own CatalogPage bundle ships this exact file at
+     * `Theme/default/views/search/search.twig`; a project overriding it follows the same standard Spryker
+     * theme-override path. See {@see checkSearchResultsTemplateMapping()}. Relative to `APPLICATION_ROOT_DIR`.
+     *
+     * @var string
+     */
+    protected const SEARCH_RESULTS_TEMPLATE_RELATIVE_PATH = '/src/Pyz/Yves/CatalogPage/Theme/default/views/search/search.twig';
+
+    /**
+     * The exact `{% define data %}` mapping the ticket-form include (README step 6) needs present in the
+     * project's search-results template. See {@see checkSearchResultsTemplateMapping()}.
+     *
+     * @var string
+     */
+    protected const SEARCH_RESULTS_TEMPLATE_EXPECTED_MAPPING = 'searchFeedbackSnapshot';
 
     /**
      * @return \Spryker\Yves\Kernel\View\View|\Symfony\Component\HttpFoundation\Response
@@ -101,6 +120,7 @@ class CheckInstallationController extends AbstractController
             $this->checkFrozenReplayEventListener(),
             $this->checkReplayPermissionRegistered(),
             $this->checkSearchRankingSpecificityIntegration(),
+            $this->checkSearchResultsTemplateMapping(),
         ];
     }
 
@@ -315,6 +335,64 @@ class CheckInstallationController extends AbstractController
             'passed' => $hasProviderPlugin && $isSpecificityWeightingEnabled,
             'remedy' => $remedy,
         ];
+    }
+
+    /**
+     * `SearchFeedbackSnapshotResultFormatterPlugin` running (README step 11) is necessary but NOT
+     * sufficient — the package's own class docblock already names that as the one registration this
+     * whole check-installation pair can't reach (it lives inside `spryker/catalog`'s own internal
+     * formatter-plugin collection, not this package's classes). This check instead catches the actual
+     * silent-failure point confirmed live: SprykerShop's own search-results template
+     * ({@see SEARCH_RESULTS_TEMPLATE_RELATIVE_PATH}) explicitly whitelists which controller-returned
+     * fields it forwards into `data` (`{% define data = {...} %}`, reading from `_view.*`) — the same
+     * pattern this project already follows for search-debug's `searchDebugTokens` and search-ranking's
+     * `randomImpactIsActive`. Miss adding this package's own `searchFeedbackSnapshot` mapping and the
+     * formatter plugin still runs and captures correctly every time (a session entry always appears), but
+     * `data.searchFeedbackSnapshot.token` is silently empty where the ticket-form include (README step 6)
+     * reads it — the hidden `snapshotToken` field never renders, every ticket saves with zero snapshot
+     * rows, and nothing anywhere errors.
+     *
+     * A WARNING, not a failure, for two independent reasons: frozen replay (step 11) is optional, and a
+     * project that doesn't use SprykerShop's `CatalogPage` search template at all (a fully custom SRP) has
+     * no file to check here — that state is indistinguishable from "forgot the mapping" from outside, so
+     * this check cannot tell them apart and errs toward not crying wolf.
+     *
+     * @return array{label: string, passed: bool, remedy: string|null}
+     */
+    protected function checkSearchResultsTemplateMapping(): array
+    {
+        $templateFilePath = $this->getSearchResultsTemplateFilePath();
+
+        if (!is_readable($templateFilePath)) {
+            return [
+                'label' => sprintf('%s maps searchFeedbackSnapshot into data (optional, README step 11)', static::SEARCH_RESULTS_TEMPLATE_RELATIVE_PATH),
+                'passed' => true,
+                'remedy' => null,
+            ];
+        }
+
+        $isMapped = str_contains((string)file_get_contents($templateFilePath), static::SEARCH_RESULTS_TEMPLATE_EXPECTED_MAPPING);
+
+        return [
+            'label' => sprintf('%s maps searchFeedbackSnapshot into data (optional, README step 11)', static::SEARCH_RESULTS_TEMPLATE_RELATIVE_PATH),
+            'passed' => $isMapped,
+            'remedy' => $isMapped
+                ? null
+                : sprintf(
+                    'Add "searchFeedbackSnapshot: _view.searchFeedbackSnapshot | default," to the {%% define data = {...} %%} block in %s (see README step 11). Without it the ticket form\'s hidden snapshotToken field silently stays empty and every ticket saves with no frozen-replay snapshot — no error anywhere. Skip this if you intentionally do not use frozen replay.',
+                    static::SEARCH_RESULTS_TEMPLATE_RELATIVE_PATH,
+                ),
+        ];
+    }
+
+    /**
+     * Isolated as its own method so a test can point it at a fixture file instead of this host shop's real
+     * template — same seam-for-testability reasoning as
+     * {@see \SprykerCommunity\Zed\SearchFeedback\Communication\Console\SearchFeedbackCheckInstallationConsole::getSearchElasticsearchFactoryOverrideFilePath()}.
+     */
+    protected function getSearchResultsTemplateFilePath(): string
+    {
+        return APPLICATION_ROOT_DIR . static::SEARCH_RESULTS_TEMPLATE_RELATIVE_PATH;
     }
 
     /**

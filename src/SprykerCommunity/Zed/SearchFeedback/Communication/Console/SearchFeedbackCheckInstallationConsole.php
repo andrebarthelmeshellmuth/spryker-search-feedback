@@ -10,8 +10,12 @@ declare(strict_types = 1);
 namespace SprykerCommunity\Zed\SearchFeedback\Communication\Console;
 
 use FilesystemIterator;
+use PDO;
+use PDOStatement;
+use Propel\Runtime\Propel;
 use RecursiveDirectoryIterator;
 use RecursiveIteratorIterator;
+use RuntimeException;
 use SimpleXMLElement;
 use Spryker\Shared\Config\Config;
 use Spryker\Shared\Kernel\KernelConstants;
@@ -21,6 +25,7 @@ use SprykerCommunity\Client\SearchFeedback\Search\ReplayCapableSearch;
 use SprykerCommunity\Client\SearchFeedback\SearchFeedbackClient;
 use SprykerCommunity\Shared\SearchFeedback\Plugin\SubmitSearchFeedbackTicketPermissionPlugin;
 use SprykerCommunity\Shared\SearchFeedback\Plugin\ViewSearchFeedbackTicketReplayPermissionPlugin;
+use SprykerCommunity\Zed\SearchFeedback\Dependency\Facade\SearchFeedbackToPermissionFacadeInterface;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 use Throwable;
@@ -95,6 +100,31 @@ class SearchFeedbackCheckInstallationConsole extends Console
     protected const SEARCH_ELASTICSEARCH_FACTORY_OVERRIDE_RELATIVE_PATH = '/src/Pyz/Client/SearchElasticsearch/SearchElasticsearchFactory.php';
 
     /**
+     * The JSON-blob columns on the snapshot table — must be LONGTEXT (Propel's `CLOB` type), not the plain
+     * TEXT a `LONGVARCHAR` column produces. See {@see checkSnapshotColumnTypes()}.
+     *
+     * @var array<string>
+     */
+    protected const SNAPSHOT_LONGTEXT_COLUMN_NAMES = ['raw_response', 'query_dsl', 'request_parameters', 'term_vector_snapshot'];
+
+    /**
+     * @var string
+     */
+    protected const SNAPSHOT_TABLE_NAME = 'spy_search_feedback_ticket_srp_snapshot';
+
+    /**
+     * Every permission plugin this package ships — a plugin being registered in code does not mean Spryker
+     * knows about it; that only happens once it's synced into `spy_permission`
+     * ({@see checkPermissionsSynced()}).
+     *
+     * @var array<string>
+     */
+    protected const PERMISSION_KEYS = [
+        SubmitSearchFeedbackTicketPermissionPlugin::KEY,
+        ViewSearchFeedbackTicketReplayPermissionPlugin::KEY,
+    ];
+
+    /**
      * The locale whose catalog defines the expected key set; the others are kept at parity with it.
      *
      * @var string
@@ -144,6 +174,8 @@ class SearchFeedbackCheckInstallationConsole extends Console
         $this->checkBackOfficeAccess($output);
         $this->checkZedTranslationCatalogComplete($output);
         $this->checkFrozenReplayWiring($output);
+        $this->checkSnapshotColumnTypes($output);
+        $this->checkPermissionsSynced($output);
 
         $output->writeln('');
 
@@ -171,8 +203,11 @@ class SearchFeedbackCheckInstallationConsole extends Console
         $output->writeln('  - three of the four frozen-replay registrations (step 11): the Client');
         $output->writeln('    CATALOG_SEARCH_RESULT_FORMATTER_PLUGINS entry, and both Permission DependencyProvider');
         $output->writeln('    entries for ViewSearchFeedbackTicketReplayPermissionPlugin — this command can only see the');
-        $output->writeln('    SearchElasticsearchFactory override (checked above). The Yves EventDispatcher entry for');
-        $output->writeln('    that same step is checked by the Yves counterpart below.');
+        $output->writeln('    SearchElasticsearchFactory override and whether the permission is SYNCED (both checked');
+        $output->writeln('    above); whether the plugin is actually REGISTERED in the DependencyProvider is DI wiring');
+        $output->writeln('    no console command can introspect. The Yves EventDispatcher entry for that same step, and');
+        $output->writeln('    the search-results template\'s searchFeedbackSnapshot mapping, are checked by the Yves');
+        $output->writeln('    counterpart below.');
         $output->writeln('');
         $output->writeln('The first of those is checkable from Yves: load /search-feedback-widget/check-installation as a');
         $output->writeln('permitted customer (SprykerCommunity\Yves\SearchFeedbackWidget\Controller\CheckInstallationController).');
@@ -398,6 +433,130 @@ class SearchFeedbackCheckInstallationConsole extends Console
         }
 
         $output->writeln('<info>✓</info> project-level SearchElasticsearchFactory override wraps Search in ReplayCapableSearch (frozen replay wired up)');
+    }
+
+    /**
+     * A real DB round trip, same posture as {@see checkTicketTable()}, but at the schema level: catches a
+     * project that installed a version of this package from before the `LONGVARCHAR` → `CLOB` fix and never
+     * re-migrated. `LONGVARCHAR` maps to plain MySQL `TEXT` (a 64KB cap) in Propel's own MySQL platform, not
+     * `LONGTEXT` — confirmed live: a real captured Elasticsearch response for a full page of products
+     * routinely exceeds that, and the truncation surfaces as `SQLSTATE[22001]: String data, right
+     * truncated` on ticket submission, not on capture. Warning, not a failure, same reasoning as
+     * {@see checkFrozenReplayWiring()}: the table exists unconditionally (it is part of the base schema),
+     * but only actually gets written to once frozen replay is wired up, which is optional.
+     *
+     * @param \Symfony\Component\Console\Output\OutputInterface $output
+     */
+    protected function checkSnapshotColumnTypes(OutputInterface $output): void
+    {
+        try {
+            $columnTypesByName = $this->readSnapshotColumnTypes();
+        } catch (Throwable $exception) {
+            $this->warnings[] = sprintf(
+                'Could not read %s\'s column types to confirm frozen-replay snapshots won\'t be truncated: %s.',
+                static::SNAPSHOT_TABLE_NAME,
+                $exception->getMessage(),
+            );
+
+            return;
+        }
+
+        $badColumnNames = [];
+
+        foreach (static::SNAPSHOT_LONGTEXT_COLUMN_NAMES as $columnName) {
+            $columnType = $columnTypesByName[$columnName] ?? null;
+
+            if ($columnType !== null && !str_starts_with($columnType, 'longtext')) {
+                $badColumnNames[$columnName] = $columnType;
+            }
+        }
+
+        if ($badColumnNames === []) {
+            $output->writeln(sprintf('<info>✓</info> %s\'s JSON-blob columns are LONGTEXT (won\'t truncate a real captured response)', static::SNAPSHOT_TABLE_NAME));
+
+            return;
+        }
+
+        $this->warnings[] = sprintf(
+            'These columns on %s are not LONGTEXT and will silently truncate a real captured snapshot: %s. Your project installed this package from before the LONGVARCHAR->CLOB schema fix — run `vendor/bin/console propel:diff` + `vendor/bin/console propel:migrate` to pick up the corrected column type (not propel:sql:insert — that reapplies the full schema dump).',
+            static::SNAPSHOT_TABLE_NAME,
+            implode(', ', array_map(fn (string $columnName, string $columnType): string => sprintf('%s (%s)', $columnName, $columnType), array_keys($badColumnNames), $badColumnNames)),
+        );
+    }
+
+    /**
+     * Isolated as its own method so a test can stub the connection lookup instead of needing a real
+     * database — same seam-for-testability reasoning as {@see getSearchElasticsearchFactoryOverrideFilePath()}.
+     *
+     * @throws \RuntimeException The query against the snapshot table did not return a statement.
+     *
+     * @return array<string, string> Column name => lowercased MySQL type.
+     */
+    protected function readSnapshotColumnTypes(): array
+    {
+        $connection = Propel::getConnection('zed');
+        $statement = $connection->query(sprintf('SHOW FULL COLUMNS FROM `%s`', static::SNAPSHOT_TABLE_NAME));
+
+        if (!($statement instanceof PDOStatement)) {
+            throw new RuntimeException(sprintf('Query against %s did not return a statement.', static::SNAPSHOT_TABLE_NAME));
+        }
+
+        $columnTypesByName = [];
+
+        foreach ($statement->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            $columnTypesByName[$row['Field']] = strtolower((string)$row['Type']);
+        }
+
+        return $columnTypesByName;
+    }
+
+    /**
+     * A permission plugin being registered in `Pyz\{Client,Zed}\Permission\PermissionDependencyProvider`
+     * does not mean Spryker knows about it yet — that only happens once it's synced into `spy_permission`,
+     * a one-time manual step (`/permission/index/sync` in Zed, or the "Sync permissions" link under
+     * Maintenance) that is NOT part of `propel:migrate` or any other install command. Confirmed live: skip
+     * it and the Company Role create/edit page throws a hard `Undefined array key "<PluginKey>"` for
+     * *every* company role, not just ones that would hold this permission — that page always evaluates
+     * every registered permission plugin against `spy_permission`.
+     *
+     * Uses {@see \SprykerCommunity\Zed\SearchFeedback\Dependency\Facade\SearchFeedbackToPermissionFacadeInterface::findPermissionByKey()},
+     * a plain DB lookup — deliberately NOT `PermissionFacade::findMergedRegisteredNonInfrastructuralPermissions()`,
+     * which is the exact method that throws the warning above when a plugin isn't yet synced, so calling it
+     * here would crash the very check meant to catch that state.
+     *
+     * @param \Symfony\Component\Console\Output\OutputInterface $output
+     */
+    protected function checkPermissionsSynced(OutputInterface $output): void
+    {
+        $unsyncedPermissionKeys = [];
+
+        foreach (static::PERMISSION_KEYS as $permissionKey) {
+            if ($this->getPermissionFacade()->findPermissionByKey($permissionKey) === null) {
+                $unsyncedPermissionKeys[] = $permissionKey;
+            }
+        }
+
+        if ($unsyncedPermissionKeys === []) {
+            $output->writeln(sprintf('<info>✓</info> all %d permission plugin(s) are synced into spy_permission', count(static::PERMISSION_KEYS)));
+
+            return;
+        }
+
+        $this->warnings[] = sprintf(
+            'These permission plugins are registered in code but NOT synced into spy_permission yet: %s. Visit /permission/index/sync in Zed once (or click "Sync permissions" under Maintenance) — until then, granting them via the Company Role GUI is impossible, and that GUI\'s create/edit page throws a hard error for every company role, not just ones that would hold these permissions.',
+            implode(', ', $unsyncedPermissionKeys),
+        );
+    }
+
+    /**
+     * Isolated as its own method (rather than an inline `$this->getFactory()->getPermissionFacade()` call)
+     * so a test can override it directly instead of needing to mock the whole
+     * `SearchFeedbackCommunicationFactory` — same seam-for-testability reasoning as
+     * {@see getSearchElasticsearchFactoryOverrideFilePath()}.
+     */
+    protected function getPermissionFacade(): SearchFeedbackToPermissionFacadeInterface
+    {
+        return $this->getFactory()->getPermissionFacade();
     }
 
     /**
