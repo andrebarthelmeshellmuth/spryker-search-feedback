@@ -16,6 +16,7 @@ use Spryker\Yves\Kernel\Controller\AbstractController;
 use Spryker\Yves\Kernel\Locator;
 use Spryker\Yves\Kernel\PermissionAwareTrait;
 use SprykerCommunity\Client\SearchFeedback\SearchFeedbackClientInterface;
+use SprykerCommunity\Client\SearchRanking\SearchRankingClientInterface;
 use SprykerCommunity\Shared\SearchFeedback\Plugin\SubmitSearchFeedbackTicketPermissionPlugin;
 use SprykerCommunity\Shared\SearchFeedback\Plugin\ViewSearchFeedbackTicketReplayPermissionPlugin;
 use SprykerCommunity\Yves\SearchFeedbackWidget\Plugin\EventDispatcher\SearchFeedbackReplayContextEventDispatcherPlugin;
@@ -324,7 +325,7 @@ class CheckInstallationController extends AbstractController
      */
     protected function isSearchRankingInstalled(): bool
     {
-        return interface_exists('SprykerCommunity\Client\SearchRanking\SearchRankingClientInterface');
+        return interface_exists(SearchRankingClientInterface::class);
     }
 
     /**
@@ -332,17 +333,12 @@ class CheckInstallationController extends AbstractController
      * needing a real Permission Client bootstrap — same reasoning `PermissionAwareTrait::can()` itself
      * doesn't offer (it calls `Locator::getInstance()` inline), which is exactly why this controller's own
      * tests mock `can()` wholesale rather than exercising it for real.
-     *
-     * @return \Spryker\Client\Permission\PermissionClientInterface
      */
     protected function getPermissionClient(): PermissionClientInterface
     {
         return Locator::getInstance()->permission()->client();
     }
 
-    /**
-     * @return \SprykerCommunity\Client\SearchFeedback\SearchFeedbackClientInterface
-     */
     protected function getSearchFeedbackClient(): SearchFeedbackClientInterface
     {
         return Locator::getInstance()->searchFeedback()->client();
@@ -352,8 +348,6 @@ class CheckInstallationController extends AbstractController
      * Only ever called after {@see isSearchRankingInstalled()} confirms the interface exists, so the
      * return type can't be declared as the sibling package's own class without making this file
      * (and its whole namespace) fail to autoload when that optional package is absent.
-     *
-     * @return object
      */
     protected function getSearchRankingClient(): object
     {

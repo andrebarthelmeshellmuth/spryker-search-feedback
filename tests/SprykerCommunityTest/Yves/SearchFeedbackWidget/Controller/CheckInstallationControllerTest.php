@@ -383,9 +383,6 @@ class CheckInstallationControllerTest extends Unit
         $this->assertStringContainsString('isSpecificityWeightingEnabled', $check['remedy']);
     }
 
-    /**
-     * @return \SprykerCommunity\Yves\SearchFeedbackWidget\Controller\CheckInstallationController|\PHPUnit\Framework\MockObject\MockObject
-     */
     protected function buildControllerMockForSpecificityIntegration(bool $hasProviderPlugin, bool $isSpecificityWeightingEnabled): CheckInstallationController
     {
         $searchFeedbackClientMock = $this->createMock(SearchFeedbackClientInterface::class);
