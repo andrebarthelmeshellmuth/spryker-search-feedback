@@ -26,6 +26,13 @@ declare(strict_types = 1);
  *   ./docker/sdk console data:import company-user
  *   ./docker/sdk console data:import company-business-unit-user
  *   ./docker/sdk console data:import company-user-role
+ *   Visit /permission/index/sync in Zed once — REQUIRED before the next line for
+ *     ViewSearchFeedbackTicketReplayPermissionPlugin specifically: it's a newer permission plugin that
+ *     may not be synced into spy_permission on a shop that installed this package before frozen replay
+ *     existed. Confirmed live: without this, `data:import company-role-permission` throws
+ *     `EntityNotFoundException: Could not find permission by key
+ *     "ViewSearchFeedbackTicketReplayPermissionPlugin"` — a hard failure, not a silent skip. Harmless to
+ *     visit even if already synced.
  *   ./docker/sdk console data:import company-role-permission
  *   ./docker/sdk console data:import glossary
  */
@@ -244,5 +251,11 @@ echo "  ./docker/sdk console data:import customer\n";
 echo "  ./docker/sdk console data:import company-user\n";
 echo "  ./docker/sdk console data:import company-business-unit-user\n";
 echo "  ./docker/sdk console data:import company-user-role\n";
+echo "\n";
+echo "  Then visit /permission/index/sync in Zed once — REQUIRED before the next import line.\n";
+echo "  ViewSearchFeedbackTicketReplayPermissionPlugin is a newer permission plugin that may not be\n";
+echo "  synced into spy_permission yet; without this, the next line throws EntityNotFoundException\n";
+echo "  instead of importing the row. Harmless to visit even if already synced.\n";
+echo "\n";
 echo "  ./docker/sdk console data:import company-role-permission\n";
 echo "  ./docker/sdk console data:import glossary\n";
