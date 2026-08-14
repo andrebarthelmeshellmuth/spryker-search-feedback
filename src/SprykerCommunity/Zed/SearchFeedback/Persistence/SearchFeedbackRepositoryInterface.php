@@ -10,6 +10,7 @@ declare(strict_types = 1);
 namespace SprykerCommunity\Zed\SearchFeedback\Persistence;
 
 use Generated\Shared\Transfer\SearchFeedbackTicketCollectionTransfer;
+use Generated\Shared\Transfer\SearchFeedbackTicketSrpSnapshotTransfer;
 use Generated\Shared\Transfer\SearchFeedbackTicketTransfer;
 
 interface SearchFeedbackRepositoryInterface
@@ -25,4 +26,9 @@ interface SearchFeedbackRepositoryInterface
      * @param int $idSearchFeedbackTicket
      */
     public function findTicketById(int $idSearchFeedbackTicket): ?SearchFeedbackTicketTransfer;
+
+    /**
+     * @param int $idSearchFeedbackTicket
+     */
+    public function findSrpSnapshotByTicketId(int $idSearchFeedbackTicket): ?SearchFeedbackTicketSrpSnapshotTransfer;
 }

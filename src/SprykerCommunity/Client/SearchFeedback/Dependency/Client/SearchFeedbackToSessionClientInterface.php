@@ -1,0 +1,36 @@
+<?php
+
+/**
+ * This file is part of the spryker-community/search-feedback package.
+ * For full license information, please view the LICENSE file that was distributed with this source code.
+ */
+
+declare(strict_types = 1);
+
+namespace SprykerCommunity\Client\SearchFeedback\Dependency\Client;
+
+interface SearchFeedbackToSessionClientInterface
+{
+    /**
+     * @param string $name
+     * @param mixed $default
+     *
+     * @return mixed
+     */
+    public function get(string $name, $default = null);
+
+    /**
+     * @param string $name
+     * @param mixed $value
+     *
+     * @return mixed
+     */
+    public function set(string $name, $value);
+
+    /**
+     * @param string $name
+     *
+     * @return mixed
+     */
+    public function remove(string $name);
+}

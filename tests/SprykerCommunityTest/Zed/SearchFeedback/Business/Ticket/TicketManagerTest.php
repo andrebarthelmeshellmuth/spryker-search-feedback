@@ -13,6 +13,7 @@ use Codeception\Test\Unit;
 use Generated\Shared\Transfer\SearchFeedbackTicketCollectionTransfer;
 use Generated\Shared\Transfer\SearchFeedbackTicketMessageRequestTransfer;
 use Generated\Shared\Transfer\SearchFeedbackTicketRequestTransfer;
+use Generated\Shared\Transfer\SearchFeedbackTicketSrpSnapshotTransfer;
 use Generated\Shared\Transfer\SearchFeedbackTicketTransfer;
 use InvalidArgumentException;
 use OutOfBoundsException;
@@ -223,6 +224,19 @@ class TicketManagerTest extends Unit
 
         // Act & Assert
         $this->assertNull((new TicketManager($entityManagerMock, $repositoryMock))->findTicketById(5));
+    }
+
+    public function testFindSrpSnapshotByTicketIdIsAPlainPassthroughToTheRepository(): void
+    {
+        // Arrange
+        $snapshotTransfer = new SearchFeedbackTicketSrpSnapshotTransfer();
+
+        $entityManagerMock = $this->createMock(SearchFeedbackEntityManagerInterface::class);
+        $repositoryMock = $this->createMock(SearchFeedbackRepositoryInterface::class);
+        $repositoryMock->expects($this->once())->method('findSrpSnapshotByTicketId')->with(5)->willReturn($snapshotTransfer);
+
+        // Act & Assert
+        $this->assertSame($snapshotTransfer, (new TicketManager($entityManagerMock, $repositoryMock))->findSrpSnapshotByTicketId(5));
     }
 
     protected function createRequestTransfer(): SearchFeedbackTicketRequestTransfer

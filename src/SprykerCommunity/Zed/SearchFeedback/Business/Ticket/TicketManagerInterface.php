@@ -13,6 +13,7 @@ use Generated\Shared\Transfer\SearchFeedbackTicketCollectionTransfer;
 use Generated\Shared\Transfer\SearchFeedbackTicketMessageRequestTransfer;
 use Generated\Shared\Transfer\SearchFeedbackTicketRequestTransfer;
 use Generated\Shared\Transfer\SearchFeedbackTicketResponseTransfer;
+use Generated\Shared\Transfer\SearchFeedbackTicketSrpSnapshotTransfer;
 use Generated\Shared\Transfer\SearchFeedbackTicketTransfer;
 
 interface TicketManagerInterface
@@ -45,4 +46,9 @@ interface TicketManagerInterface
      * @param int $idSearchFeedbackTicket
      */
     public function findTicketById(int $idSearchFeedbackTicket): ?SearchFeedbackTicketTransfer;
+
+    /**
+     * @param int $idSearchFeedbackTicket
+     */
+    public function findSrpSnapshotByTicketId(int $idSearchFeedbackTicket): ?SearchFeedbackTicketSrpSnapshotTransfer;
 }

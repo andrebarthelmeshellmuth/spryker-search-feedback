@@ -11,6 +11,7 @@ namespace SprykerCommunity\Yves\SearchFeedbackWidget\Dependency\Client;
 
 use Generated\Shared\Transfer\SearchFeedbackTicketRequestTransfer;
 use Generated\Shared\Transfer\SearchFeedbackTicketResponseTransfer;
+use Generated\Shared\Transfer\SearchFeedbackTicketSrpSnapshotTransfer;
 
 class SearchFeedbackWidgetToSearchFeedbackClientBridge implements SearchFeedbackWidgetToSearchFeedbackClientInterface
 {
@@ -30,5 +31,10 @@ class SearchFeedbackWidgetToSearchFeedbackClientBridge implements SearchFeedback
     public function submitTicket(SearchFeedbackTicketRequestTransfer $requestTransfer): SearchFeedbackTicketResponseTransfer
     {
         return $this->searchFeedbackClient->submitTicket($requestTransfer);
+    }
+
+    public function consumeSnapshot(string $token): ?SearchFeedbackTicketSrpSnapshotTransfer
+    {
+        return $this->searchFeedbackClient->consumeSnapshot($token);
     }
 }

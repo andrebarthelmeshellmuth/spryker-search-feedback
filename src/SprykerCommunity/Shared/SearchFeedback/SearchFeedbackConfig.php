@@ -64,6 +64,31 @@ class SearchFeedbackConfig extends AbstractSharedConfig
     public const AUTHOR_TYPE_ZED_USER = 'zed_user';
 
     /**
+     * The key `SearchFeedbackSnapshotResultFormatterPlugin`'s output is nested under in a search response —
+     * same convention search-debug's own `SEARCH_RESULT_KEY` establishes.
+     *
+     * @var string
+     */
+    public const SEARCH_RESULT_KEY = 'searchFeedbackSnapshot';
+
+    /**
+     * Key under SEARCH_RESULT_KEY carrying the one-time session-lookup token the ticket form embeds as a
+     * hidden field — never the captured data itself, which stays server-side (session) end to end.
+     *
+     * @var string
+     */
+    public const KEY_SNAPSHOT_TOKEN = 'token';
+
+    /**
+     * Query parameter `DetailController::buildSearchResultsPageUrl()` appends to a ticket's "View SRP" link
+     * when it has a frozen snapshot, and `SearchFeedbackReplayContextEventDispatcherPlugin` reads on the
+     * Yves side to trigger a replay instead of a live search.
+     *
+     * @var string
+     */
+    public const REQUEST_PARAM_SRP_REPLAY_TICKET = 'srpReplayTicket';
+
+    /**
      * @return array<string>
      */
     public function getTopics(): array

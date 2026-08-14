@@ -27,14 +27,17 @@ to read it, or any reply, back from the storefront. Everything past submission h
 
 Structurally close to [spryker-community/search-ranking-optimizer](https://github.com/andrebarthelmeshellmuth/spryker-search-ranking-optimizer)'s
 SRP relevance-rating widget (Yves widget → Gateway-controller write → Zed persistence), but a different
-bounded context: this is qualitative support/VoC ticketing, not a numeric ranking signal. It has no
-dependency on `search-ranking`/`search-ranking-optimizer`'s tuning machinery, and no dependency on
-`search-debug`'s Elasticsearch `explain` internals — it only reads the query/filter/SKU state already on
-the rendered SRP. Kept standalone so a shop can install it without either of those.
+bounded context: this is qualitative support/VoC ticketing, not a numeric ranking signal. It has no hard
+dependency on `search-ranking`/`search-ranking-optimizer`'s tuning machinery — the optional integration
+that lets a ticket's frozen snapshot also carry search-ranking's specificity-weighting result is a soft
+`suggest`-only coupling (see [Installation](#installation)) that additionally only produces anything once
+search-ranking's specificity weighting itself is turned on (off by default there — see its own README's
+step 14c), the same shape `search-ranking` itself already uses toward `search-debug`. Kept standalone so a
+shop can install it without any of those.
 
 ## Status
 
-Feature-complete for its scope. Verified: 104 Codeception tests (Client, Zed, Zed GUI and Yves layers plus
+Feature-complete for its scope. Verified: 134 Codeception tests (Client, Zed, Zed GUI and Yves layers plus
 both browser Presentation suites, including real-database integration coverage for the full submit → reply
 → status-change → list/find round trip), phpcs clean, and the package's public `SearchFeedbackFacade` at
 100% method coverage. See [Testing and CI](#testing-and-ci) below for the measured numbers and the
@@ -54,6 +57,16 @@ both browser Presentation suites, including real-database integration coverage f
   triage view, not a per-market page); the ticket detail page shows the customer's email (resolved from
   their customer reference, cached per page load) instead of the raw reference, and a "View search results"
   link that reconstructs the exact SRP the ticket was filed from, in either dynamic-store-mode configuration.
+- **Frozen replay.** Ranking isn't stable over time in a typical shop — nightly randomized tie-breaking,
+  regularly-refreshed business scores, an optimizer retuning formula weights — so re-running the same query
+  later often shows a different page than the one a ticket was filed about. When the optional wiring in
+  [Installation](#installation) is registered, this package captures the raw Elasticsearch response (and,
+  if `spryker-community/search-ranking` is installed AND has specificity weighting turned on — off by
+  default, see its README's step 14c — its specificity-weighting result) at the moment a
+  ticket is filed, and the "View search results" link replays that exact frozen response instead of running
+  a live search — while still rendering it through today's live template/formatter code, so only the
+  ranking data itself is frozen. A ticket filed before this feature existed, or on a shop that hasn't wired
+  it, falls back to a live search exactly as before — this is additive, never a hard requirement.
 
 The SRP ticket form (rendered below the product grid, outside the filter form — see step 5), the Zed
 ticket grid (List of Tickets, sortable/searchable via DataTables), and a ticket's detail page (context +
@@ -70,10 +83,12 @@ full conversation thread + reply form + status actions):
 - PHP >= 8.3
 - Spryker (kernel/gui/acl/customer/company-user/store/permission-extension/propel-orm/transfer/user/
   zed-request — see `composer.json` for floors, verified by `composer check-floors`)
-- **No search engine required.** Unlike the sibling `search-debug`/`search-ranking`/
-  `search-ranking-optimizer` packages, this one never queries Elasticsearch/OpenSearch — a ticket only
-  *records* the query/filters/page/SKUs a customer was looking at, it never re-runs or re-scores that
-  search. Propel/MySQL is the only datastore.
+- **Elasticsearch/OpenSearch, via `spryker/search-elasticsearch`.** Unlike earlier versions of this
+  package, it now also *captures* the raw search response for a ticket's frozen replay (see
+  [What it does](#what-it-does)) — but it still never issues its own query. The only place this package
+  talks to the search engine at all is reconstructing a previously-captured response from stored data
+  (`Elastica\Response`/`Query`/`ResultSet\DefaultBuilder`), never a live call. Propel/MySQL remains the only
+  real datastore.
 - **B2B company-user accounts.** `CompanyUserPermissionAuthorizer` resolves "does this customer actually
   hold `SubmitSearchFeedbackTicketPermissionPlugin`" via their active `CompanyUser`, the same
   permission-granting mechanism the rest of a B2B shop already uses (same posture as the sibling
@@ -134,6 +149,7 @@ full conversation thread + reply form + status actions):
            csrfToken: searchFeedbackTicketCsrfToken(),
            submitUrl: storePrefix ~ '/search-feedback-widget/submit-ticket',
            topics: getSearchFeedbackTicketTopics(),
+           snapshotToken: data.searchFeedbackSnapshot.token | default(''),
        },
    } only %}
    ```
@@ -173,9 +189,80 @@ full conversation thread + reply form + status actions):
     generate route: Route 'search-feedback-widget/submit-ticket' not found` the moment the ticket-form
     include tries to build its `submitUrl`. Standard practice for any package that adds a Yves route, not
     unique to this one, but easy to forget mid-walkthrough since nothing points at it explicitly.
-11. In the Zed ACL module, create your "ticket worker" and "feedback admin" groups and grant/deny access to
+11. **Frozen replay wiring** (optional but recommended — without it, "View SRP" on the Zed ticket detail
+    page just re-runs a live search, which is the exact drift this feature exists to close; see
+    [What it does](#what-it-does)):
+    - Register `SearchFeedbackSnapshotResultFormatterPlugin` in the Client `CatalogDependencyProvider`'s
+      `CATALOG_SEARCH_RESULT_FORMATTER_PLUGINS` list. **This alone is not enough if your SRP twig template
+      whitelists which controller-returned fields it forwards into `data`** — SprykerShop's own
+      `CatalogPage` search template does exactly that
+      (`{% define data = {...} %}` in `Theme/default/views/search/search.twig`, reading from `_view.*`), and
+      a project that copied/extended that template for other community packages (search-debug's
+      `searchDebugTokens`, search-ranking's `randomImpactIsActive`, …) has to add this package's key the
+      same way:
+      ```twig
+      searchFeedbackSnapshot: _view.searchFeedbackSnapshot | default,
+      ```
+      Confirmed live: without this line the plugin still runs and captures correctly every time (a session
+      entry always appears), but `data.searchFeedbackSnapshot.token` is silently empty in the ticket-form
+      include below — the hidden `snapshotToken` field never renders, every ticket saves with zero snapshot
+      rows, and nothing anywhere errors. This is the single most notorious silent-failure point in this
+      whole step; if `search-feedback:check-installation`'s frozen-replay section is green but tickets still
+      have no snapshot, check this template mapping first.
+    - Register `SearchFeedbackReplayContextEventDispatcherPlugin` in the Yves
+      `EventDispatcherDependencyProvider::getEventDispatcherPlugins()`.
+    - Register `ViewSearchFeedbackTicketReplayPermissionPlugin` in both the Client and Zed
+      `PermissionDependencyProvider::getPermissionPlugins()`, and grant it to whichever company role should
+      be able to review a replay — same mechanism as step 4, a separate, independently-grantable permission.
+      **A brand-new permission plugin needs one extra step the Company Role GUI won't do for you**: Spryker
+      only knows about a permission plugin once it's been synced into `spy_permission`, and that sync is not
+      automatic on deploy. Visit `/permission/index/sync` in Zed once (or click "Sync permissions" under
+      Maintenance in the sidebar) after registering the plugin. Skipping this doesn't just hide the
+      permission from the grant checkbox — it makes the Company Role edit/create page throw a hard
+      `ErrorException: Undefined array key "ViewSearchFeedbackTicketReplayPermissionPlugin"` for *every*
+      company role, not just ones that would hold this permission, because that page always evaluates every
+      registered permission plugin against `spy_permission`. Confirmed live. This is a generic Spryker
+      gotcha, not specific to this package, but it bites hard the first time a project adds its first
+      community-package permission plugin. Once synced, this package's `data/glossary.csv` already ships
+      the `permission.name.ViewSearchFeedbackTicketReplayPermissionPlugin` label the Company Role GUI needs
+      to render the checkbox (same `permission.name.*` convention `SubmitSearchFeedbackTicketPermissionPlugin`
+      uses, step 4) — re-run `vendor/bin/console data:import glossary` (step 13) if that page instead throws
+      `MissingTranslationException: Could not find a translation for key permission.name....`.
+    - Add a project-level `Pyz\Client\SearchElasticsearch\SearchElasticsearchFactory` overriding
+      `createSearchClient()` to wrap the real `Search` in `ReplayCapableSearch` — this is the seam that
+      actually swaps a live ES call for the frozen snapshot; see the class's own docblock. First
+      Factory-level (not just DependencyProvider-level) override this package needs — a new pattern if
+      your project hasn't overridden a vendor Client Factory before, but a small one:
+      ```php
+      use Spryker\Client\Kernel\Locator; // NOT Spryker\Shared\Kernel\Locator — that class doesn't exist.
+                                          // Locator is a separate concrete class per layer; only the
+                                          // interface it implements is shared. Since this file is Client-
+                                          // layer code, this is the Locator to use.
+
+      class SearchElasticsearchFactory extends SprykerSearchElasticsearchFactory
+      {
+          public function createSearchClient(): SearchInterface
+          {
+              return new ReplayCapableSearch(
+                  parent::createSearchClient(),
+                  Locator::getInstance()->searchFeedback()->client(),
+                  Locator::getInstance()->customer()->client(),
+              );
+          }
+      }
+      ```
+    - Optional, only if `spryker-community/search-ranking` is also installed: register
+      `SprykerCommunity\Client\SearchRanking\Plugin\SearchFeedback\SearchFeedbackTermVectorSnapshotProviderPlugin`
+      in your project's `Pyz\Client\SearchFeedback\SearchFeedbackDependencyProvider::getTermVectorSnapshotProviderPlugins()`
+      override, so a ticket's snapshot also carries the specificity-weighting result that scored it. That
+      result is only ever non-null once search-ranking's specificity weighting is turned on too — it's
+      **off by default** there, a project-level override of
+      `Pyz\Client\SearchRanking\SearchRankingConfig::isSpecificityWeightingEnabled()` (see search-ranking's
+      README, step 14c). Registering this plugin without that flag is harmless, just a no-op: every
+      snapshot's `hasTermVectorSnapshot` flag stays `false`.
+12. In the Zed ACL module, create your "ticket worker" and "feedback admin" groups and grant/deny access to
     `SearchFeedbackGui/Detail/changeStatus` accordingly — this package ships no ACL fixture data.
-12. **Translations.** Two separate mechanisms, one per layer — Zed's `trans` filter does **not** read from
+13. **Translations.** Two separate mechanisms, one per layer — Zed's `trans` filter does **not** read from
     the Yves-facing Glossary module, same split as the sibling `search-ranking`/`search-ranking-optimizer`
     packages:
     - **Zed GUI** (ticket list/detail, reply form, status labels): ships as
@@ -192,7 +279,7 @@ full conversation thread + reply form + status actions):
       ```bash
       vendor/bin/console data:import glossary
       ```
-13. **Verify the installation.**
+14. **Verify the installation.**
     ```bash
     vendor/bin/console search-feedback:check-installation
     ```
@@ -217,6 +304,37 @@ full conversation thread + reply form + status actions):
     so it cannot confirm the route/Twig plugins from step 5 or the template include from step 6 — it says
     so in its output.
 
+    It also reports on frozen replay (step 11, optional): it checks the three package classes that step
+    ships (`ReplayCapableSearch`, `SearchFeedbackSnapshotResultFormatterPlugin`,
+    `ViewSearchFeedbackTicketReplayPermissionPlugin`) load, and — the one project-level piece it CAN see
+    from Zed — that `src/Pyz/Client/SearchElasticsearch/SearchElasticsearchFactory.php` exists and actually
+    wraps `Search` in `ReplayCapableSearch`. Since the whole step is optional, a missing override is a
+    **warning, not a failure**: skip it if you intentionally don't use frozen replay. The other two step-11
+    registrations (the Client `CATALOG_SEARCH_RESULT_FORMATTER_PLUGINS` entry and both Permission
+    DependencyProvider entries) are DI wiring this command cannot introspect any more than it can any other
+    DependencyProvider registration in this file; the Yves `EventDispatcherDependencyProvider` entry for
+    that same step is covered by the Yves counterpart below instead.
+
+    Three more checks, added after real bugs surfaced during this feature's first live end-to-end
+    verification:
+    - **Snapshot column types.** A real DB round trip confirming `raw_response`/`query_dsl`/
+      `request_parameters`/`term_vector_snapshot` on `spy_search_feedback_ticket_srp_snapshot` are actually
+      `LONGTEXT`, not plain `TEXT`. Catches a project that installed this package from before the
+      `LONGVARCHAR`→`CLOB` schema fix and never re-migrated — a real captured Elasticsearch response
+      routinely exceeds `TEXT`'s 64KB cap, and the truncation only surfaces as a 500 on ticket submission,
+      not at install time. Warning, not a failure — same "optional feature" posture as the rest of step 11.
+    - **Permission sync.** Confirms `SubmitSearchFeedbackTicketPermissionPlugin` and
+      `ViewSearchFeedbackTicketReplayPermissionPlugin` are actually synced into `spy_permission` (a real DB
+      lookup, not just class-loadable). A permission plugin being registered in
+      `PermissionDependencyProvider` does not mean Spryker knows about it — that needs a one-time
+      `/permission/index/sync` visit in Zed (see step 11 above), and skipping it doesn't just hide the
+      grant checkbox, it throws a hard error on the Company Role create/edit page for *every* role, not
+      just ones that would hold the permission. Confirmed live.
+    - **Search-results template mapping**, on the Yves counterpart below: confirms the project's
+      `src/Pyz/Yves/CatalogPage/Theme/default/views/search/search.twig` actually maps
+      `searchFeedbackSnapshot: _view.searchFeedbackSnapshot` into `data` — the single most notorious
+      silent-failure point in step 11, confirmed live (see step 11 above for the full explanation).
+
     Register it in `src/Pyz/Zed/Console/ConsoleDependencyProvider.php`:
     ```php
     use SprykerCommunity\Zed\SearchFeedback\Communication\Console\SearchFeedbackCheckInstallationConsole;
@@ -233,9 +351,18 @@ full conversation thread + reply form + status actions):
     **Yves-side counterpart.** `/search-feedback-widget/check-installation` closes exactly the gap the
     console command names above — it runs from inside the real Yves DI container (no new plugin
     registration needed, it uses the same `SearchFeedbackWidgetRouteProviderPlugin` from step 5), and
-    checks the three Twig functions and the submit-ticket route from step 5. It is complementary, not a
-    replacement: it does not re-check the core namespace, plugin class loadability, or the ticket table —
-    run the console command for those.
+    checks the three Twig functions and the submit-ticket route from step 5, plus (optional, step 11)
+    whether `SearchFeedbackReplayContextEventDispatcherPlugin` is registered as a `KernelEvents::REQUEST`
+    listener — miss it and a replay link is never gated by the view-replay permission at the Yves layer
+    (the Zed gateway still re-checks authorization independently, so this is a UX gap, not a security hole).
+    It also checks whether `ViewSearchFeedbackTicketReplayPermissionPlugin` is registered on the Client, and
+    whether the optional search-ranking specificity integration is wired up and enabled. And it checks
+    whether the project's search-results template actually maps `searchFeedbackSnapshot` into `data` (see
+    step 11 above) — the single most notorious silent-failure point in the whole frozen-replay feature,
+    confirmed live: without it, the formatter still captures correctly every time, but the ticket form's
+    hidden `snapshotToken` field silently stays empty and no ticket ever gets a frozen-replay snapshot.
+    It is complementary, not a replacement: it does not re-check the core namespace, plugin class
+    loadability, or the ticket table — run the console command for those.
 
     Reachable only when BOTH hold:
     - The route exists at all — governed by
@@ -263,11 +390,29 @@ full conversation thread + reply form + status actions):
   there's no natural "your tickets" boundary to enforce even if it were wanted. Access control here is
   role-level (ticket worker vs. feedback admin, via the two separately-restrictable controller actions),
   not row-level.
+- **The same is true of a replay, on the storefront side.** `ViewSearchFeedbackTicketReplayPermissionPlugin`
+  gates "can this customer replay a ticket's frozen SRP at all," not "does this specific ticket belong to
+  them or their company" — a customer holding the permission can replay any ticket by id, including another
+  customer's. Deliberate, confirmed choice, not an oversight: same posture as the Zed-side point above,
+  extended to a Yves-granted permission instead of a Zed ACL role. Grant
+  `ViewSearchFeedbackTicketReplayPermissionPlugin` accordingly — treat it as "can see any customer's search
+  context," not as a personal, self-scoped permission.
 - **One flat conversation thread per ticket, no internal/private notes.** Every message on a ticket —
   customer or Zed admin — is visible to any Zed admin who can view the ticket. There's no way for one Zed
   admin to leave a note for another without the customer's original message context, since there's no
   customer-facing view to accidentally leak an internal note into anyway; the constraint here is purely
   "everyone with access sees everything," not a security boundary between Zed users.
+- **A frozen snapshot can go stale relative to today's product/index data.** The captured `_source` is
+  exactly what Elasticsearch returned at ticket-filing time; if a field gets renamed or restructured by a
+  later reindex, replaying an old ticket runs that old-shaped data through today's formatters, which can
+  silently show a missing badge/facet rather than error. Accepted trade-off, not a bug — the alternative
+  (migrating every stored snapshot forward on every reindex) is far more machinery than this feature
+  warrants.
+- **The stored `queryDsl` field can go stale for a different reason.** It's captured for informational
+  display only, never replayed — `Spryker\Client\SearchElasticsearch\Search\Search::executeQuery()` never
+  passes Elastica's `$options` through, so anything out-of-band a future ranking strategy might add
+  (`search_pipeline`, a neural rerank pass) would be invisible to it. Not a concern for replay itself, since
+  replay only ever uses the raw response.
 
 ## Testing and CI
 
@@ -328,12 +473,12 @@ vendor/bin/codecept run   -c vendor/spryker-community/search-feedback/tests/Spry
 vendor/bin/codecept run   -c vendor/spryker-community/search-feedback/tests/SprykerCommunityTest/Yves/SearchFeedbackWidget
 ```
 
-86 tests in this table, plus 18 more in the two browser Presentation suites below (104 total), all green:
+106 tests in this table, plus 28 more in the two browser Presentation suites below (134 total), all green:
 
 | layer | tests | notable coverage |
 |---|---|---|
-| Client | 8 | `SearchFeedbackClient`, `SearchFeedbackFactory`, `SearchFeedbackStub`, `SearchFeedbackConfig`, permission plugin — 100% methods |
-| Zed (`SearchFeedback`) | 38 | `SearchFeedbackFacade` 100% (5/5), `TicketManager` 100%, `SearchFeedbackEntityManager`/`Repository`/`Mapper` 100%, `CompanyUserPermissionAuthorizer` 100%, `GatewayController` 100%, `SearchFeedbackCheckInstallationConsole` 100% (every check's pass/fail branch, via a mocked Facade + `CommandTester`) |
+| Client | 19 | `SearchFeedbackClient`, `SearchFeedbackFactory`, `SearchFeedbackStub`, `SearchFeedbackConfig`, both permission plugins — 100% methods; plus `ReplayCapableSearch`'s fall-through/replay decision tree and `SearchFeedbackSnapshotContext`'s capture/consume/eviction behavior (frozen replay, see [What it does](#what-it-does)) |
+| Zed (`SearchFeedback`) | 47 | `SearchFeedbackFacade` 100% (6/6), `TicketManager` 100%, `SearchFeedbackEntityManager`/`Repository`/`Mapper` 100%, `CompanyUserPermissionAuthorizer` 100%, `GatewayController` 100%, `SearchFeedbackCheckInstallationConsole` 100% (every check's pass/fail branch, via a mocked Facade + `CommandTester`) |
 | Zed (`SearchFeedbackGui`) | 25 | `ReplyForm` validation (via a real Symfony `FormFactory`), `SearchFeedbackGuiCommunicationFactory` DI wiring (all 7 `get*()`/`create*()` methods), `TicketTable::configure()`/`resolveCustomerEmail()`, `DetailController::resolveCustomerEmail()`/`buildSearchResultsPageUrl()` (both dynamic-store-mode branches, against this shop's real config), `IndexController::resolveStoreName()`/`resolveLocaleName()` |
 | Yves (`SearchFeedbackWidget`) | 15 | `SearchFeedbackWidgetFactory` DI wiring, `CheckInstallationController` 100% (permission gate, both Twig-function/route check branches, against a hand-built `ContainerInterface` fixture — no real app boot needed) |
 
@@ -348,7 +493,7 @@ deliberate copy of.
 
 ### Known coverage gaps
 
-Three classes are **not** exercised beyond a DI-wiring smoke test, and this is a structural limitation of
+Several classes are **not** exercised beyond a DI-wiring smoke test, and this is a structural limitation of
 testing Communication/Yves-layer classes outside a live HTTP request — not an oversight:
 
 - **`SearchFeedbackGuiCommunicationFactory::createReplyForm()`**. It resolves the real Zed Silex
@@ -378,6 +523,16 @@ testing Communication/Yves-layer classes outside a live HTTP request — not an 
   `SearchDebugContextEventDispatcherPlugin::handleRequest()` permission-granted branch. The controller's
   own request-parsing helper (`buildRedirectParameters()`) and its collaborators (`SearchFeedbackClient`,
   `SearchFeedbackWidgetFactory`) are covered independently.
+- **Frozen-replay capture/delivery path**: `SearchFeedbackSnapshotResultFormatterPlugin` (needs a real
+  `Elastica\ResultSet` from a live search to exercise meaningfully — `ReplayCapableSearch`, the class that
+  actually *consumes* a captured snapshot, has full coverage instead, see the table above),
+  `SearchFeedbackReplayContextEventDispatcherPlugin` (same `PermissionAwareTrait`/Silex-app limitation as
+  `SubmitTicketController` above), and `GatewayController::getTicketSrpSnapshotAction()` /
+  `SearchFeedbackEntityManager::createTicket()`'s snapshot-persistence branch (would need the same
+  real-database integration style `GatewayControllerTest`/`SearchFeedbackFacadeTest` already use for the
+  rest of the ticket lifecycle — not yet added). Verified manually end-to-end in a live shop instead (real
+  Propel migration applied, `phpstan`/`phpcs` clean against every new file) — see the package's PR for the
+  verification log.
 
 ### Static analysis
 
@@ -411,6 +566,24 @@ vendor/bin/phpstan analyse -c vendor/spryker-community/search-feedback/phpstan.n
 > demoshop's seeded catalog and store/locale scope. Point it at a different shop and most of it will
 > simply fail on missing data, not on a real defect. It exists to catch UI regressions while developing
 > this package, not as something adopters are expected to run.
+
+**Reproducing the fixture on a fresh clone of this demoshop.** `spencor.hopkin@acme.com`
+(`customer_reference` `DE--1`) is already a base-fixture member of the `test-company` company with no
+company-role assignment — that's the negative-test account, nothing to add. The permitted account
+(`search-admin@test-company.example`) is not a base fixture; add it to
+`data/import/common/common/`:
+
+- `customer.csv`: `SearchAdmin--1,en_US,,search-admin@test-company.example,Mr,Search,Admin,,Male,,$2y$12$CUw8PyVm4isuM.ugzQhZ0.os.n1nlGJOA61SEd7cgjXivzt5LqJ2.,2026-08-10`
+  (that hash is `change123`, the password the Yves Tester expects)
+- `company_user.csv`: `SearchAdmin--1,SearchAdmin--1,test-company,true`
+- `company_business_unit_user.csv`: `SearchAdmin--1,test-business-unit-1`
+- `company_user_role.csv`: `test-company_Admin,SearchAdmin--1`
+- `company_role_permission.csv`: both `test-company_Admin,SubmitSearchFeedbackTicketPermissionPlugin,`
+  and `test-company_Admin,ViewSearchFeedbackTicketReplayPermissionPlugin,`
+
+Then re-import: `vendor/bin/console data:import customer company-user company-business-unit-user
+company-user-role company-role-permission`. The Zed suite's login (`amZed()`) uses this demoshop's
+standard backoffice test-authentication helper and needs no extra fixture.
 
 Two suites, split by layer:
 

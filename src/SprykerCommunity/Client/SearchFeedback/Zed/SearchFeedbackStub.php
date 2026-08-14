@@ -11,6 +11,8 @@ namespace SprykerCommunity\Client\SearchFeedback\Zed;
 
 use Generated\Shared\Transfer\SearchFeedbackTicketRequestTransfer;
 use Generated\Shared\Transfer\SearchFeedbackTicketResponseTransfer;
+use Generated\Shared\Transfer\SearchFeedbackTicketSrpSnapshotRequestTransfer;
+use Generated\Shared\Transfer\SearchFeedbackTicketSrpSnapshotResponseTransfer;
 use SprykerCommunity\Client\SearchFeedback\Dependency\Client\SearchFeedbackToZedRequestInterface;
 
 class SearchFeedbackStub implements SearchFeedbackStubInterface
@@ -30,6 +32,20 @@ class SearchFeedbackStub implements SearchFeedbackStubInterface
         /** @var \Generated\Shared\Transfer\SearchFeedbackTicketResponseTransfer $responseTransfer */
         $responseTransfer = $this->zedRequestClient->call(
             '/search-feedback/gateway/submit-ticket',
+            $requestTransfer,
+        );
+
+        return $responseTransfer;
+    }
+
+    /**
+     * @param \Generated\Shared\Transfer\SearchFeedbackTicketSrpSnapshotRequestTransfer $requestTransfer
+     */
+    public function getTicketSrpSnapshot(SearchFeedbackTicketSrpSnapshotRequestTransfer $requestTransfer): SearchFeedbackTicketSrpSnapshotResponseTransfer
+    {
+        /** @var \Generated\Shared\Transfer\SearchFeedbackTicketSrpSnapshotResponseTransfer $responseTransfer */
+        $responseTransfer = $this->zedRequestClient->call(
+            '/search-feedback/gateway/get-ticket-srp-snapshot',
             $requestTransfer,
         );
 

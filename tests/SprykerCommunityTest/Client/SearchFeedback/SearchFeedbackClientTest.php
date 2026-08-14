@@ -14,6 +14,8 @@ use Generated\Shared\Transfer\SearchFeedbackTicketRequestTransfer;
 use Generated\Shared\Transfer\SearchFeedbackTicketResponseTransfer;
 use Spryker\Client\Kernel\Container;
 use SprykerCommunity\Client\SearchFeedback\Dependency\Client\SearchFeedbackToZedRequestInterface;
+use SprykerCommunity\Client\SearchFeedback\Dependency\Plugin\TermVectorSnapshotProviderPluginInterface;
+use SprykerCommunity\Client\SearchFeedback\Dependency\Plugin\TermVectorSnapshotRestorerPluginInterface;
 use SprykerCommunity\Client\SearchFeedback\SearchFeedbackClient;
 use SprykerCommunity\Client\SearchFeedback\SearchFeedbackDependencyProvider;
 use SprykerCommunity\Client\SearchFeedback\SearchFeedbackFactory;
@@ -53,5 +55,77 @@ class SearchFeedbackClientTest extends Unit
 
         // Act & Assert
         $this->assertSame($responseTransfer, $client->submitTicket($requestTransfer));
+    }
+
+    public function testHasTermVectorSnapshotProviderPluginReturnsFalseWhenNoneRegistered(): void
+    {
+        // Arrange
+        $container = new Container();
+        $container->set(SearchFeedbackDependencyProvider::TERM_VECTOR_SNAPSHOT_PROVIDER_PLUGINS, fn () => []);
+
+        $factory = new SearchFeedbackFactory();
+        $factory->setContainer($container);
+
+        $client = new SearchFeedbackClient();
+        $client->setFactory($factory);
+
+        // Act & Assert
+        $this->assertFalse($client->hasTermVectorSnapshotProviderPlugin());
+    }
+
+    public function testHasTermVectorSnapshotProviderPluginReturnsTrueWhenOneIsRegistered(): void
+    {
+        // Arrange
+        $providerPluginMock = $this->createMock(TermVectorSnapshotProviderPluginInterface::class);
+
+        $container = new Container();
+        $container->set(SearchFeedbackDependencyProvider::TERM_VECTOR_SNAPSHOT_PROVIDER_PLUGINS, fn () => [$providerPluginMock]);
+
+        $factory = new SearchFeedbackFactory();
+        $factory->setContainer($container);
+
+        $client = new SearchFeedbackClient();
+        $client->setFactory($factory);
+
+        // Act & Assert
+        $this->assertTrue($client->hasTermVectorSnapshotProviderPlugin());
+    }
+
+    public function testRestoreTermVectorSnapshotIsANoOpWhenNoRestorerPluginIsRegistered(): void
+    {
+        // Arrange
+        $container = new Container();
+        $container->set(SearchFeedbackDependencyProvider::TERM_VECTOR_SNAPSHOT_RESTORER_PLUGINS, fn () => []);
+
+        $factory = new SearchFeedbackFactory();
+        $factory->setContainer($container);
+
+        $client = new SearchFeedbackClient();
+        $client->setFactory($factory);
+
+        // Act & Assert — no exception is the whole assertion; nothing registered means nothing to call.
+        $client->restoreTermVectorSnapshot('{"relevanceWeight":0.5}');
+    }
+
+    public function testRestoreTermVectorSnapshotCallsEveryRegisteredRestorerPluginWithTheGivenSnapshot(): void
+    {
+        // Arrange
+        $firstRestorerPluginMock = $this->createMock(TermVectorSnapshotRestorerPluginInterface::class);
+        $firstRestorerPluginMock->expects($this->once())->method('restoreTermVectorSnapshot')->with('{"relevanceWeight":0.5}');
+
+        $secondRestorerPluginMock = $this->createMock(TermVectorSnapshotRestorerPluginInterface::class);
+        $secondRestorerPluginMock->expects($this->once())->method('restoreTermVectorSnapshot')->with('{"relevanceWeight":0.5}');
+
+        $container = new Container();
+        $container->set(SearchFeedbackDependencyProvider::TERM_VECTOR_SNAPSHOT_RESTORER_PLUGINS, fn () => [$firstRestorerPluginMock, $secondRestorerPluginMock]);
+
+        $factory = new SearchFeedbackFactory();
+        $factory->setContainer($container);
+
+        $client = new SearchFeedbackClient();
+        $client->setFactory($factory);
+
+        // Act
+        $client->restoreTermVectorSnapshot('{"relevanceWeight":0.5}');
     }
 }

@@ -42,4 +42,19 @@ class SearchResultsPage
      * @var string
      */
     public const FLASH_MESSAGE_SUCCESS = 'Thanks — your feedback ticket was submitted.';
+
+    /**
+     * Owned by the sibling spryker-community/search-debug package's overlay, not this one — present in
+     * this demoshop because search-debug is installed alongside search-feedback. Used by
+     * FrozenReplayCest to read the "Relevance weight (α)" line search-ranking's optional debug-data
+     * expander plugin contributes to that same overlay.
+     *
+     * @var string
+     */
+    public const SELECTOR_SCORE_TRIGGER = '.search-debug-trigger';
+
+    /**
+     * @var string
+     */
+    public const SELECTOR_OVERLAY = '.search-debug-overlay';
 }

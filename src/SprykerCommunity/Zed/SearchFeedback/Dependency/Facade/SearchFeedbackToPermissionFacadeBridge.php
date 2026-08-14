@@ -9,6 +9,8 @@ declare(strict_types = 1);
 
 namespace SprykerCommunity\Zed\SearchFeedback\Dependency\Facade;
 
+use Generated\Shared\Transfer\PermissionTransfer;
+
 class SearchFeedbackToPermissionFacadeBridge implements SearchFeedbackToPermissionFacadeInterface
 {
     /**
@@ -31,5 +33,13 @@ class SearchFeedbackToPermissionFacadeBridge implements SearchFeedbackToPermissi
     public function can(string $permissionKey, $identifier): bool
     {
         return $this->permissionFacade->can($permissionKey, $identifier);
+    }
+
+    /**
+     * @param string $permissionKey
+     */
+    public function findPermissionByKey(string $permissionKey): ?PermissionTransfer
+    {
+        return $this->permissionFacade->findPermissionByKey($permissionKey);
     }
 }

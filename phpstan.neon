@@ -6,3 +6,35 @@ parameters:
     # classes, which don't exist outside a host shop.
     bootstrapFiles:
         - '%rootDir%/../../../phpstan-bootstrap.php'
+
+    ignoreErrors:
+        -
+            # Spryker\Yves\Kernel\Controller\AbstractController::getApplication() itself declares this
+            # union return type, and core's own getRouter()/getRequestStack()/getLocale() call ->get() on
+            # it exactly as unguarded as this — Application (Silex/Pimple-based) does have get() at
+            # runtime, PHPStan just can't see it declared across the union. Matches the accepted core
+            # idiom, not a bug here; same ignore the sibling search-debug package's own check-installation
+            # controller already carries for the identical call.
+            message: '#Call to an undefined method Spryker\\Service\\Container\\ContainerInterface\|Spryker\\Yves\\Kernel\\Application::get\(\)\.#'
+            path: src/SprykerCommunity/Yves/SearchFeedbackWidget/Controller/CheckInstallationController.php
+            count: 1
+        -
+            # getSearchRankingClient()'s return type is deliberately bare `object` (see its own docblock) —
+            # this package cannot type-hint the sibling search-ranking package's own client class without
+            # making the whole file fail to autoload in a project that hasn't installed it. The one caller,
+            # checkSearchRankingSpecificityIntegration(), only ever calls this after isSearchRankingInstalled()
+            # confirms the interface exists, so the method really is callable at runtime — PHPStan just can't
+            # see across that runtime guard.
+            message: '#Call to an undefined method object::isSpecificityWeightingEnabled\(\)\.#'
+            path: src/SprykerCommunity/Yves/SearchFeedbackWidget/Controller/CheckInstallationController.php
+            count: 1
+        -
+            # Spryker\Yves\Kernel\Locator resolves bundle proxies (->permission(), ->searchFeedback(),
+            # ->searchRanking()) through __call() at runtime — PHPStan cannot see through that regardless
+            # of the generated Ide\AutoCompletion stub (confirmed: searchFeedback()/searchRanking() ARE
+            # listed there, and PHPStan still flags the call, so it isn't consulting that stub as a mixin
+            # for this class). Same idiom as PermissionAwareTrait::can() itself, which makes the identical
+            # call unguarded.
+            message: '#Call to an undefined method Spryker\\Yves\\Kernel\\Locator::(permission|searchFeedback|searchRanking)\(\)\.#'
+            path: src/SprykerCommunity/Yves/SearchFeedbackWidget/Controller/CheckInstallationController.php
+            count: 3

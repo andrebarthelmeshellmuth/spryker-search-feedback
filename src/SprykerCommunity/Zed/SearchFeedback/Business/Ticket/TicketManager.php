@@ -13,6 +13,7 @@ use Generated\Shared\Transfer\SearchFeedbackTicketCollectionTransfer;
 use Generated\Shared\Transfer\SearchFeedbackTicketMessageRequestTransfer;
 use Generated\Shared\Transfer\SearchFeedbackTicketRequestTransfer;
 use Generated\Shared\Transfer\SearchFeedbackTicketResponseTransfer;
+use Generated\Shared\Transfer\SearchFeedbackTicketSrpSnapshotTransfer;
 use Generated\Shared\Transfer\SearchFeedbackTicketTransfer;
 use InvalidArgumentException;
 use OutOfBoundsException;
@@ -130,5 +131,17 @@ class TicketManager implements TicketManagerInterface
     public function findTicketById(int $idSearchFeedbackTicket): ?SearchFeedbackTicketTransfer
     {
         return $this->repository->findTicketById($idSearchFeedbackTicket);
+    }
+
+    /**
+     * The permission re-check happens one layer up, in
+     * {@see \SprykerCommunity\Zed\SearchFeedback\Communication\Controller\GatewayController} — same
+     * posture as submitTicket().
+     *
+     * @param int $idSearchFeedbackTicket
+     */
+    public function findSrpSnapshotByTicketId(int $idSearchFeedbackTicket): ?SearchFeedbackTicketSrpSnapshotTransfer
+    {
+        return $this->repository->findSrpSnapshotByTicketId($idSearchFeedbackTicket);
     }
 }

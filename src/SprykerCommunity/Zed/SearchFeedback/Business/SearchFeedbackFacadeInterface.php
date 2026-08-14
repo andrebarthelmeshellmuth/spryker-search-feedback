@@ -13,6 +13,7 @@ use Generated\Shared\Transfer\SearchFeedbackTicketCollectionTransfer;
 use Generated\Shared\Transfer\SearchFeedbackTicketMessageRequestTransfer;
 use Generated\Shared\Transfer\SearchFeedbackTicketRequestTransfer;
 use Generated\Shared\Transfer\SearchFeedbackTicketResponseTransfer;
+use Generated\Shared\Transfer\SearchFeedbackTicketSrpSnapshotTransfer;
 use Generated\Shared\Transfer\SearchFeedbackTicketTransfer;
 
 interface SearchFeedbackFacadeInterface
@@ -75,4 +76,18 @@ interface SearchFeedbackFacadeInterface
      * @param int $idSearchFeedbackTicket
      */
     public function findTicketById(int $idSearchFeedbackTicket): ?SearchFeedbackTicketTransfer;
+
+    /**
+     * Specification:
+     * - Returns a ticket's frozen SRP snapshot (raw ES response, query DSL, optional termvector capture),
+     *   or null if the ticket has none (predates this feature, or the capture plugins weren't wired).
+     * - Does NOT re-check the caller's permission — that's done by the caller
+     *   ({@see \SprykerCommunity\Zed\SearchFeedback\Communication\Controller\GatewayController}), the only
+     *   entry point this method is meant to be reached through.
+     *
+     * @api
+     *
+     * @param int $idSearchFeedbackTicket
+     */
+    public function findSrpSnapshotByTicketId(int $idSearchFeedbackTicket): ?SearchFeedbackTicketSrpSnapshotTransfer;
 }
