@@ -408,6 +408,15 @@ full conversation thread + reply form + status actions):
   silently show a missing badge/facet rather than error. Accepted trade-off, not a bug — the alternative
   (migrating every stored snapshot forward on every reindex) is far more machinery than this feature
   warrants.
+- **A pending snapshot can be silently evicted before a ticket is submitted.**
+  `SearchFeedbackSnapshotContext` stages a captured snapshot in session storage, capped at 5 pending
+  entries (FIFO eviction) to keep a long browsing session's storage bounded. Only a short-lived, random
+  token — never the captured response/query/termvector data itself — is embedded as a hidden field in
+  the ticket form; the browser never sees the actual snapshot, so it cannot be forged. Five or more
+  searches — including opening "View SRP" replays, which are searches too — between seeing the results
+  you want to complain about and clicking Submit will silently evict the session-side snapshot that
+  token points to; the ticket still submits, just without a frozen replay (`hasTermVectorSnapshot:
+  false`), with nothing telling the customer or the Zed admin that happened.
 - **The stored `queryDsl` field can go stale for a different reason.** It's captured for informational
   display only, never replayed — `Spryker\Client\SearchElasticsearch\Search\Search::executeQuery()` never
   passes Elastica's `$options` through, so anything out-of-band a future ranking strategy might add
