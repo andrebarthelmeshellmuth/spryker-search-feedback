@@ -30,8 +30,10 @@ SRP relevance-rating widget (Yves widget → Gateway-controller write → Zed pe
 bounded context: this is qualitative support/VoC ticketing, not a numeric ranking signal. It has no hard
 dependency on `search-ranking`/`search-ranking-optimizer`'s tuning machinery — the optional integration
 that lets a ticket's frozen snapshot also carry search-ranking's specificity-weighting result is a soft
-`suggest`-only coupling (see [Installation](#installation)), the same shape `search-ranking` itself already
-uses toward `search-debug`. Kept standalone so a shop can install it without any of those.
+`suggest`-only coupling (see [Installation](#installation)) that additionally only produces anything once
+search-ranking's specificity weighting itself is turned on (off by default there — see its own README's
+step 14c), the same shape `search-ranking` itself already uses toward `search-debug`. Kept standalone so a
+shop can install it without any of those.
 
 ## Status
 
@@ -59,7 +61,8 @@ both browser Presentation suites, including real-database integration coverage f
   regularly-refreshed business scores, an optimizer retuning formula weights — so re-running the same query
   later often shows a different page than the one a ticket was filed about. When the optional wiring in
   [Installation](#installation) is registered, this package captures the raw Elasticsearch response (and,
-  if `spryker-community/search-ranking` is installed, its specificity-weighting result) at the moment a
+  if `spryker-community/search-ranking` is installed AND has specificity weighting turned on — off by
+  default, see its README's step 14c — its specificity-weighting result) at the moment a
   ticket is filed, and the "View search results" link replays that exact frozen response instead of running
   a live search — while still rendering it through today's live template/formatter code, so only the
   ranking data itself is frozen. A ticket filed before this feature existed, or on a shop that hasn't wired
@@ -222,7 +225,12 @@ full conversation thread + reply form + status actions):
     - Optional, only if `spryker-community/search-ranking` is also installed: register
       `SprykerCommunity\Client\SearchRanking\Plugin\SearchFeedback\SearchFeedbackTermVectorSnapshotProviderPlugin`
       in your project's `Pyz\Client\SearchFeedback\SearchFeedbackDependencyProvider::getTermVectorSnapshotProviderPlugins()`
-      override, so a ticket's snapshot also carries the specificity-weighting result that scored it.
+      override, so a ticket's snapshot also carries the specificity-weighting result that scored it. That
+      result is only ever non-null once search-ranking's specificity weighting is turned on too — it's
+      **off by default** there, a project-level override of
+      `Pyz\Client\SearchRanking\SearchRankingConfig::isSpecificityWeightingEnabled()` (see search-ranking's
+      README, step 14c). Registering this plugin without that flag is harmless, just a no-op: every
+      snapshot's `hasTermVectorSnapshot` flag stays `false`.
 12. In the Zed ACL module, create your "ticket worker" and "feedback admin" groups and grant/deny access to
     `SearchFeedbackGui/Detail/changeStatus` accordingly — this package ships no ACL fixture data.
 13. **Translations.** Two separate mechanisms, one per layer — Zed's `trans` filter does **not** read from
