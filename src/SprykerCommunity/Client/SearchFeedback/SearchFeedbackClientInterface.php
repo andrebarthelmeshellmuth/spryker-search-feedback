@@ -66,4 +66,18 @@ interface SearchFeedbackClientInterface
      * @api
      */
     public function hasTermVectorSnapshotProviderPlugin(): bool;
+
+    /**
+     * Specification:
+     * - Calls every registered `TermVectorSnapshotRestorerPluginInterface` implementation with the given
+     *   snapshot string, so each can restore its own request-scoped "last computed" state to the frozen
+     *   value — see that interface for why. Called by `ReplayCapableSearch` during a replay request; not
+     *   meant to be called by application code directly.
+     * - A shop with no restorer plugin registered is a safe no-op.
+     *
+     * @api
+     *
+     * @param string $termVectorSnapshot
+     */
+    public function restoreTermVectorSnapshot(string $termVectorSnapshot): void;
 }

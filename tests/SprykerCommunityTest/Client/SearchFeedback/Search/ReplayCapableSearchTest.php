@@ -137,6 +137,78 @@ class ReplayCapableSearchTest extends Unit
         $this->assertCount(0, $result->getResults());
     }
 
+    /**
+     * Regression test for a real bug found live: the debug overlay's displayed relevanceWeight/specificity
+     * numbers always reflected LIVE current settings during a replay, not the ones that actually scored
+     * the ticket — because query expansion (which computes those numbers) still runs fresh on every
+     * request, replay or not. This asserts the fix's actual mechanism: `restoreTermVectorSnapshot()` gets
+     * called on the search-feedback Client with the ticket's own frozen string, which is how a sibling
+     * package like search-ranking gets a chance to overwrite its own request-scoped "last computed" state
+     * back to the frozen value before its debug-overlay integration reads it.
+     */
+    public function testRestoresTheTermVectorSnapshotOnTheSearchFeedbackClientWhenOneIsPresent(): void
+    {
+        // Arrange
+        $searchQueryMock = $this->createMock(QueryInterface::class);
+        $requestParameters = [SearchFeedbackConfig::REQUEST_PARAM_SRP_REPLAY_TICKET => '42'];
+
+        $snapshotTransfer = (new SearchFeedbackTicketSrpSnapshotTransfer())
+            ->setRawResponse('{"hits":{"hits":[]}}')
+            ->setQueryDsl('{"query":{"match_all":{}}}')
+            ->setHasTermVectorSnapshot(true)
+            ->setTermVectorSnapshot('{"relevanceWeight":0.01}');
+
+        $decoratedSearchMock = $this->createMock(SearchInterface::class);
+        $searchFeedbackClientMock = $this->createMock(SearchFeedbackClientInterface::class);
+        $searchFeedbackClientMock->method('getTicketSrpSnapshot')
+            ->willReturn(
+                (new SearchFeedbackTicketSrpSnapshotResponseTransfer())
+                    ->setIsFound(true)
+                    ->setSnapshot($snapshotTransfer),
+            );
+        $searchFeedbackClientMock->expects($this->once())
+            ->method('restoreTermVectorSnapshot')
+            ->with('{"relevanceWeight":0.01}');
+
+        $customerClientMock = $this->createMock(CustomerClientInterface::class);
+        $customerClientMock->method('getCustomer')->willReturn((new CustomerTransfer())->setCustomerReference('CUST-1'));
+
+        $replaySearch = new ReplayCapableSearch($decoratedSearchMock, $searchFeedbackClientMock, $customerClientMock);
+
+        // Act
+        $replaySearch->search($searchQueryMock, [], $requestParameters);
+    }
+
+    public function testDoesNotAttemptToRestoreATermVectorSnapshotWhenTheTicketHasNone(): void
+    {
+        // Arrange
+        $searchQueryMock = $this->createMock(QueryInterface::class);
+        $requestParameters = [SearchFeedbackConfig::REQUEST_PARAM_SRP_REPLAY_TICKET => '42'];
+
+        $snapshotTransfer = (new SearchFeedbackTicketSrpSnapshotTransfer())
+            ->setRawResponse('{"hits":{"hits":[]}}')
+            ->setQueryDsl('{"query":{"match_all":{}}}')
+            ->setHasTermVectorSnapshot(false);
+
+        $decoratedSearchMock = $this->createMock(SearchInterface::class);
+        $searchFeedbackClientMock = $this->createMock(SearchFeedbackClientInterface::class);
+        $searchFeedbackClientMock->method('getTicketSrpSnapshot')
+            ->willReturn(
+                (new SearchFeedbackTicketSrpSnapshotResponseTransfer())
+                    ->setIsFound(true)
+                    ->setSnapshot($snapshotTransfer),
+            );
+        $searchFeedbackClientMock->expects($this->never())->method('restoreTermVectorSnapshot');
+
+        $customerClientMock = $this->createMock(CustomerClientInterface::class);
+        $customerClientMock->method('getCustomer')->willReturn((new CustomerTransfer())->setCustomerReference('CUST-1'));
+
+        $replaySearch = new ReplayCapableSearch($decoratedSearchMock, $searchFeedbackClientMock, $customerClientMock);
+
+        // Act
+        $replaySearch->search($searchQueryMock, [], $requestParameters);
+    }
+
     public function testReplaysTheStoredSnapshotThroughResultFormattersWhenSomeArePassed(): void
     {
         // Arrange

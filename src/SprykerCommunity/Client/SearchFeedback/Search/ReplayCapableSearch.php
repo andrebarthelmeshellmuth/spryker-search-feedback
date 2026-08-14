@@ -31,6 +31,15 @@ use SprykerCommunity\Shared\SearchFeedback\SearchFeedbackConfig;
  * no logged-in customer, the ticket has no snapshot, or Zed denies the request — never an error, since all
  * of these are ordinary, expected states (a plain search request, a ticket filed before this feature
  * existed, an unauthorized visitor Yves's own gate somehow didn't already stop).
+ *
+ * Also restores any captured termvector snapshot (see `TermVectorSnapshotRestorerPluginInterface`) before
+ * returning — this is the ONLY thing this class does that isn't just "swap the ES call". Confirmed live
+ * why it has to: query expansion (search-ranking's own function_score wrapping, which computes THIS
+ * request's own "last specificity weighting result") still runs fresh on every request regardless of
+ * replay, since only the actual Elasticsearch call gets intercepted here. Without the restore step, a
+ * replay's debug overlay would silently show live current values instead of the ones that actually scored
+ * the ticket — looking correctly frozen right up until a live setting changes and the same replay is
+ * reopened.
  */
 class ReplayCapableSearch implements SearchInterface
 {
@@ -118,6 +127,10 @@ class ReplayCapableSearch implements SearchInterface
         }
 
         $snapshotTransfer = $responseTransfer->getSnapshotOrFail();
+
+        if ($snapshotTransfer->getHasTermVectorSnapshot() && $snapshotTransfer->getTermVectorSnapshot() !== null) {
+            $this->searchFeedbackClient->restoreTermVectorSnapshot($snapshotTransfer->getTermVectorSnapshot());
+        }
 
         $response = new Response($snapshotTransfer->getRawResponseOrFail());
         $queryDsl = json_decode($snapshotTransfer->getQueryDslOrFail(), true);

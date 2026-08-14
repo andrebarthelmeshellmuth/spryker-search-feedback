@@ -81,4 +81,18 @@ class SearchFeedbackClient extends AbstractClient implements SearchFeedbackClien
     {
         return $this->getFactory()->getTermVectorSnapshotProviderPlugins() !== [];
     }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @api
+     *
+     * @param string $termVectorSnapshot
+     */
+    public function restoreTermVectorSnapshot(string $termVectorSnapshot): void
+    {
+        foreach ($this->getFactory()->getTermVectorSnapshotRestorerPlugins() as $termVectorSnapshotRestorerPlugin) {
+            $termVectorSnapshotRestorerPlugin->restoreTermVectorSnapshot($termVectorSnapshot);
+        }
+    }
 }

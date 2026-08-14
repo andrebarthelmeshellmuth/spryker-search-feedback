@@ -43,6 +43,16 @@ class SearchFeedbackDependencyProvider extends AbstractDependencyProvider
     public const TERM_VECTOR_SNAPSHOT_PROVIDER_PLUGINS = 'TERM_VECTOR_SNAPSHOT_PROVIDER_PLUGINS';
 
     /**
+     * The restore-side counterpart to TERM_VECTOR_SNAPSHOT_PROVIDER_PLUGINS — same "implementations live
+     * in a sibling package, never registered by this package itself" convention. See
+     * {@see \SprykerCommunity\Client\SearchFeedback\Dependency\Plugin\TermVectorSnapshotRestorerPluginInterface}
+     * for why this exists.
+     *
+     * @var string
+     */
+    public const TERM_VECTOR_SNAPSHOT_RESTORER_PLUGINS = 'TERM_VECTOR_SNAPSHOT_RESTORER_PLUGINS';
+
+    /**
      * @param \Spryker\Client\Kernel\Container $container
      */
     #[\Override]
@@ -52,8 +62,9 @@ class SearchFeedbackDependencyProvider extends AbstractDependencyProvider
         $container = $this->addZedRequestClient($container);
         $container = $this->addSessionClient($container);
         $container = $this->addSnapshotContext($container);
+        $container = $this->addTermVectorSnapshotProviderPlugins($container);
 
-        return $this->addTermVectorSnapshotProviderPlugins($container);
+        return $this->addTermVectorSnapshotRestorerPlugins($container);
     }
 
     /**
@@ -110,6 +121,26 @@ class SearchFeedbackDependencyProvider extends AbstractDependencyProvider
      * @return array<\SprykerCommunity\Client\SearchFeedback\Dependency\Plugin\TermVectorSnapshotProviderPluginInterface>
      */
     protected function getTermVectorSnapshotProviderPlugins(): array
+    {
+        return [];
+    }
+
+    /**
+     * Empty by default — see TERM_VECTOR_SNAPSHOT_RESTORER_PLUGINS.
+     *
+     * @param \Spryker\Client\Kernel\Container $container
+     */
+    protected function addTermVectorSnapshotRestorerPlugins(Container $container): Container
+    {
+        $container->set(static::TERM_VECTOR_SNAPSHOT_RESTORER_PLUGINS, fn () => $this->getTermVectorSnapshotRestorerPlugins());
+
+        return $container;
+    }
+
+    /**
+     * @return array<\SprykerCommunity\Client\SearchFeedback\Dependency\Plugin\TermVectorSnapshotRestorerPluginInterface>
+     */
+    protected function getTermVectorSnapshotRestorerPlugins(): array
     {
         return [];
     }

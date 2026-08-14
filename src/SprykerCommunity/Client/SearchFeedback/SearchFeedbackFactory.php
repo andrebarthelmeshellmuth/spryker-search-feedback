@@ -43,4 +43,12 @@ class SearchFeedbackFactory extends AbstractFactory
     {
         return $this->getProvidedDependency(SearchFeedbackDependencyProvider::TERM_VECTOR_SNAPSHOT_PROVIDER_PLUGINS);
     }
+
+    /**
+     * @return array<\SprykerCommunity\Client\SearchFeedback\Dependency\Plugin\TermVectorSnapshotRestorerPluginInterface>
+     */
+    public function getTermVectorSnapshotRestorerPlugins(): array
+    {
+        return $this->getProvidedDependency(SearchFeedbackDependencyProvider::TERM_VECTOR_SNAPSHOT_RESTORER_PLUGINS);
+    }
 }
