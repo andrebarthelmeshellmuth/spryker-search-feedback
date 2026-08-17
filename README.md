@@ -171,12 +171,15 @@ full conversation thread + reply form + status actions):
    project's `config/Zed/navigation.xml`. If your project already lists every top-level Zed nav group
    explicitly (rather than relying on Spryker's default full-merge, i.e. `ZedNavigationConfig::
    getMergeStrategy()` returns `BREADCRUMB_MERGE_STRATEGY`), a brand-new top-level group silently never
-   renders — nest the block as a `<pages>` entry inside an existing top-level group instead (e.g.
-   `merchandising`, next to the sibling `search-preferences` entry). In that case **don't** also copy the
-   package's own `<search-feedback-tickets>`/`<search-feedback-ticket-detail>` children into your root
-   file — leave your root entry childless and let them merge in automatically from the package's own
-   `navigation.xml`. Redeclaring them yourself causes `array_merge_recursive` to collide on the duplicate
-   scalar leaves (same key, same string value) and turn them into arrays, which crashes the page with
+   renders — nest the block as a `<pages>` entry inside a top-level group instead, either an existing one
+   (e.g. `merchandising`, next to the sibling `search-preferences` entry) or a new project-owned one you
+   create yourself (e.g. a shared `search-toolbox` category grouping this package with
+   `spryker-community/search-index-alias` — see that package's own README and this project's
+   `config/Zed/navigation.xml` for a worked example). In that case **don't** also copy the package's own
+   `<search-feedback-tickets>`/`<search-feedback-ticket-detail>` children into your root file — leave your
+   root entry childless and let them merge in automatically from the package's own `navigation.xml`.
+   Redeclaring them yourself causes `array_merge_recursive` to collide on the duplicate scalar leaves
+   (same key, same string value) and turn them into arrays, which crashes the page with
    `Twig\Error\RuntimeError: ... ("Array to string conversion") in "@Gui/Partials/navigation.twig"`.
    Then run `console navigation:cache:remove` + `console navigation:build-cache` to pick up the change —
    the Zed nav tree is cached and does not re-read `navigation.xml` on every request.
