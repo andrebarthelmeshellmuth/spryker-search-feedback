@@ -8,6 +8,13 @@ to read it, or any reply, back from the storefront. Everything past submission h
 
 *Part of the [Search Relevance](https://search-relevance.dev/) project.*
 
+> **Not an official Spryker project.** `spryker-community/*` is an independent, community-built
+> package namespace with no affiliation to, sponsorship by, or endorsement from Spryker Systems GmbH.
+> The name describes what these packages are (community contributions for Spryker Commerce OS), not who
+> maintains them. The matching Packagist namespace is held by an unrelated GitHub organization, which is
+> why installation goes through a VCS repository entry rather than a plain `composer require` — see
+> [Installation](#installation).
+
 ## Contents
 
 - [Why a separate package](#why-a-separate-package)
