@@ -103,8 +103,10 @@ full conversation thread + reply form + status actions).
 
 ## Installation
 
-1. Not published on Packagist under the `spryker-community` vendor namespace — install from a VCS
-   repository instead:
+1. Not yet published on Packagist under the `spryker-community` vendor namespace. That namespace and its
+   GitHub org (`github.com/spryker-community`) are maintained by Spryker's own community program — we're
+   in contact with them about bringing this package in properly (their `dummy-module` template is the
+   onboarding path). Until that lands, install from a VCS repository instead:
    ```json
    "repositories": [
        {
