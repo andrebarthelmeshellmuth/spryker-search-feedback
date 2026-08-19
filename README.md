@@ -82,7 +82,13 @@ both browser Presentation suites, including real-database integration coverage f
 
 The SRP ticket form (rendered below the product grid, outside the filter form — see step 5), the Zed
 ticket grid (List of Tickets, sortable/searchable via DataTables), and a ticket's detail page (context +
-full conversation thread + reply form + status actions).
+full conversation thread + reply form + status actions):
+
+![The storefront search results page with a "Not happy with these results?" box below the product grid: a Topic dropdown (Relevance/Missing results/Wrong order/Filters-facets/Other), a free-text body field, and a Send Feedback button](docs/screenshots/yves-ticket-form.png)
+
+![The Zed ticket grid: ID, topic, search term, a colored status badge (orange Open / blue Answered / green Closed), filed-at timestamp, and a View action per row](docs/screenshots/zed-ticket-list.png)
+
+![The Zed ticket detail page: Ticket Context (topic, search term, filters JSON, page, SKUs shown, store/locale, status with Mark answered/Mark closed actions, filed-at), and Conversation showing the customer's original message and a Zed admin's reply, with a reply form below](docs/screenshots/zed-ticket-detail.png)
 
 ## Requirements
 
