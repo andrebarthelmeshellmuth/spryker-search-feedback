@@ -1,5 +1,10 @@
 # Spryker Search Feedback
 
+[![CI](https://github.com/andrebarthelmeshellmuth/spryker-search-feedback/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/andrebarthelmeshellmuth/spryker-search-feedback/actions/workflows/ci.yml)
+[![PHP](https://img.shields.io/badge/php-%E2%89%A5%208.3-777bb4)](composer.json)
+[![PHPStan](https://img.shields.io/badge/PHPStan-level%208-2a6b2a)](phpstan.neon)
+[![License](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
+
 A voice-of-customer capture tool for the search results page (SRP): an authorized storefront customer can
 file a free-text ticket about a set of search results — tied to the query term, active filters, page
 number, and the SKUs actually shown on that page, plus a topic — and Zed back-office admins hold a
