@@ -1,5 +1,10 @@
 # Spryker Search Feedback
 
+[![CI](https://github.com/andrebarthelmeshellmuth/spryker-search-feedback/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/andrebarthelmeshellmuth/spryker-search-feedback/actions/workflows/ci.yml)
+[![PHP](https://img.shields.io/badge/php-%E2%89%A5%208.3-777bb4)](composer.json)
+[![PHPStan](https://img.shields.io/badge/PHPStan-level%208-2a6b2a)](phpstan.neon)
+[![License](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
+
 A voice-of-customer capture tool for the search results page (SRP): an authorized storefront customer can
 file a free-text ticket about a set of search results — tied to the query term, active filters, page
 number, and the SKUs actually shown on that page, plus a topic — and Zed back-office admins hold a
@@ -7,6 +12,13 @@ conversation about it from there. The Yves side is write-only: once a ticket is 
 to read it, or any reply, back from the storefront. Everything past submission happens in Zed.
 
 *Part of the [Search Relevance](https://search-relevance.dev/) project.*
+
+> **Not an official Spryker project.** `spryker-community/*` is an independent, community-built
+> package namespace with no affiliation to, sponsorship by, or endorsement from Spryker Systems GmbH.
+> The name describes what these packages are (community contributions for Spryker Commerce OS), not who
+> maintains them. The matching Packagist namespace is held by an unrelated GitHub organization, which is
+> why installation goes through a VCS repository entry rather than a plain `composer require` — see
+> [Installation](#installation).
 
 ## Contents
 
