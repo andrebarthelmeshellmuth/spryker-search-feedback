@@ -11,7 +11,10 @@ declare(strict_types = 1);
 
 $scriptDir = __DIR__;
 $outDir = $scriptDir . '/out';
-@mkdir($outDir, 0777, true);
+
+if (!is_dir($outDir)) {
+    mkdir($outDir, 0777, true);
+}
 
 function svgDataUri(string $svg): string
 {
