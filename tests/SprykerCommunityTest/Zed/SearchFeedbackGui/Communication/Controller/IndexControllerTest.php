@@ -12,14 +12,19 @@ namespace SprykerCommunityTest\Zed\SearchFeedbackGui\Communication\Controller;
 use Codeception\Test\Unit;
 use ReflectionMethod;
 use SprykerCommunity\Zed\SearchFeedbackGui\Communication\Controller\IndexController;
+use SprykerCommunity\Zed\SearchFeedbackGui\Communication\SearchFeedbackGuiCommunicationFactory;
+use SprykerCommunity\Zed\SearchFeedbackGui\Communication\Table\TicketTable;
 use Symfony\Component\HttpFoundation\Request;
 
 /**
  * `resolveStoreName()`/`resolveLocaleName()` are `protected` and touch nothing but the given `Request` —
  * no factory/app-context dependency at all, so driven directly via Reflection. `indexAction()`/
- * `tableAction()` themselves are NOT covered here: both resolve `createTicketTable(...)->render()`/
- * `->fetchData()`, which need the full Zed Silex app bootstrap (see `TicketTableTest`'s own docblock) —
- * already covered end-to-end by the Zed GUI Presentation suite (`PreFlightCest`, `TicketGridAndDetailCest`).
+ * `tableAction()` are covered below the same way this package's sibling test files already override
+ * `getFactory()` on an anonymous subclass: a mocked `TicketTable` stands in for the real one (which DOES
+ * need the full Zed Silex app bootstrap to construct — see `TicketTableTest`'s own docblock — but that is
+ * a fact about testing `TicketTable` ITSELF, not about testing this controller's own orchestration of it),
+ * so `TicketTable`'s own `render()`/`fetchData()` behavior stays covered end-to-end by the Zed GUI
+ * Presentation suite (`PreFlightCest`, `TicketGridAndDetailCest`) as before.
  *
  * @group SprykerCommunityTest
  * @group Zed
@@ -57,6 +62,56 @@ class IndexControllerTest extends Unit
         $localeName = $this->invokeProtected('resolveLocaleName', [Request::create('/search-feedback-gui?localeName=de_DE')]);
 
         $this->assertSame('de_DE', $localeName);
+    }
+
+    public function testIndexActionBuildsTheViewResponseFromTheFactory(): void
+    {
+        $ticketTableMock = $this->createMock(TicketTable::class);
+        $ticketTableMock->method('render')->willReturn('<table>rendered ticket table</table>');
+
+        $factoryMock = $this->createMock(SearchFeedbackGuiCommunicationFactory::class);
+        $factoryMock->method('createTicketTable')->with('DE', 'de_DE')->willReturn($ticketTableMock);
+        $factoryMock->method('getAllStoreNames')->willReturn(['DE', 'AT']);
+        $factoryMock->method('getAllLocaleNames')->willReturn(['de_DE', 'de_AT']);
+
+        $controller = $this->buildControllerWithFactory($factoryMock);
+
+        $result = $controller->indexAction(Request::create('/search-feedback-gui?storeName=DE&localeName=de_DE'));
+
+        $this->assertSame('<table>rendered ticket table</table>', $result['ticketTable']);
+        $this->assertSame(['DE', 'AT'], $result['stores']);
+        $this->assertSame(['de_DE', 'de_AT'], $result['locales']);
+        $this->assertSame('DE', $result['selectedStoreName']);
+        $this->assertSame('de_DE', $result['selectedLocaleName']);
+    }
+
+    public function testTableActionReturnsTheFetchedDataAsJson(): void
+    {
+        $ticketTableMock = $this->createMock(TicketTable::class);
+        $ticketTableMock->method('fetchData')->willReturn(['data' => [], 'recordsTotal' => 0]);
+
+        $factoryMock = $this->createMock(SearchFeedbackGuiCommunicationFactory::class);
+        $factoryMock->method('createTicketTable')->willReturn($ticketTableMock);
+
+        $controller = $this->buildControllerWithFactory($factoryMock);
+
+        $jsonResponse = $controller->tableAction(Request::create('/search-feedback-gui/table'));
+
+        $this->assertSame('{"data":[],"recordsTotal":0}', $jsonResponse->getContent());
+    }
+
+    protected function buildControllerWithFactory(SearchFeedbackGuiCommunicationFactory $factoryMock): IndexController
+    {
+        return new class ($factoryMock) extends IndexController {
+            public function __construct(protected SearchFeedbackGuiCommunicationFactory $injectedFactory)
+            {
+            }
+
+            protected function getFactory(): SearchFeedbackGuiCommunicationFactory
+            {
+                return $this->injectedFactory;
+            }
+        };
     }
 
     /**
