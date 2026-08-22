@@ -45,6 +45,13 @@ class SearchFeedbackGuiDependencyProvider extends AbstractBundleDependencyProvid
     public const FACADE_LOCALE = 'FACADE_LOCALE';
 
     /**
+     * @uses \Spryker\Zed\Form\Communication\Plugin\Application\FormApplicationPlugin::SERVICE_FORM_CSRF_PROVIDER
+     *
+     * @var string
+     */
+    public const SERVICE_FORM_CSRF_PROVIDER = 'form.csrf_provider';
+
+    /**
      * @param \Spryker\Zed\Kernel\Container $container
      */
     #[\Override]
@@ -56,6 +63,7 @@ class SearchFeedbackGuiDependencyProvider extends AbstractBundleDependencyProvid
         $container = $this->addCustomerFacade($container);
         $container = $this->addStoreFacade($container);
         $container = $this->addLocaleFacade($container);
+        $container = $this->addFormCsrfProviderService($container);
 
         return $container;
     }
@@ -116,6 +124,19 @@ class SearchFeedbackGuiDependencyProvider extends AbstractBundleDependencyProvid
         $container->set(static::FACADE_LOCALE, fn (Container $container) => new SearchFeedbackGuiToLocaleFacadeBridge(
             $container->getLocator()->locale()->facade(),
         ));
+
+        return $container;
+    }
+
+    /**
+     * @param \Spryker\Zed\Kernel\Container $container
+     */
+    protected function addFormCsrfProviderService(Container $container): Container
+    {
+        $container->set(
+            static::SERVICE_FORM_CSRF_PROVIDER,
+            fn (Container $container) => $container->getApplicationService(static::SERVICE_FORM_CSRF_PROVIDER),
+        );
 
         return $container;
     }

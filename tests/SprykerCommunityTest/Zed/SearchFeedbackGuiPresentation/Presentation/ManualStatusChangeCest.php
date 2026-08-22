@@ -58,12 +58,12 @@ class ManualStatusChangeCest
 
         // Mark closed, then mark open again — a real round trip regardless of the ticket's real
         // starting status (closing an already-closed ticket, or opening an already-open one, are both
-        // still valid no-op-ish state transitions the same "Mark ..." link mechanism supports).
-        $i->click(TicketDetailPage::markStatusLinkXpath('closed'));
+        // still valid no-op-ish state transitions the same "Mark ..." button mechanism supports).
+        $i->click(TicketDetailPage::markStatusButtonXpath('closed'));
         $i->see(TicketDetailPage::FLASH_MESSAGE_STATUS_UPDATED);
         $i->assertStringContainsString('closed', $i->grabTextFrom('//tr[th[text()="Status"]]/td'));
 
-        $i->click(TicketDetailPage::markStatusLinkXpath('open'));
+        $i->click(TicketDetailPage::markStatusButtonXpath('open'));
         $i->see(TicketDetailPage::FLASH_MESSAGE_STATUS_UPDATED);
         $i->assertStringContainsString('open', $i->grabTextFrom('//tr[th[text()="Status"]]/td'));
 
@@ -73,7 +73,7 @@ class ManualStatusChangeCest
         }
 
         $originalStatus = str_contains((string)$originalStatusRow, 'answered') ? 'answered' : 'closed';
-        $i->click(TicketDetailPage::markStatusLinkXpath($originalStatus));
+        $i->click(TicketDetailPage::markStatusButtonXpath($originalStatus));
         $i->see(TicketDetailPage::FLASH_MESSAGE_STATUS_UPDATED);
     }
 }

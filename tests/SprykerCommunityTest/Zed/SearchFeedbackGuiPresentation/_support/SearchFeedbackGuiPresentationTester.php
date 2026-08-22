@@ -45,4 +45,37 @@ class SearchFeedbackGuiPresentationTester extends Actor
             return false;
         }
     }
+
+    /**
+     * WebDriver has no native "POST to a URL with these fields" primitive — a real browser only ever
+     * submits a POST via an actual `<form>` on the page. Used by tests that need to reach a CSRF-protected
+     * POST endpoint with input no real button on the page ever produces (e.g. a deliberately bogus field
+     * value), by injecting and submitting an equivalent throwaway form via JS instead.
+     *
+     * @param string $actionUrl
+     * @param array<string, string> $fields
+     */
+    public function submitFormViaJs(string $actionUrl, array $fields): void
+    {
+        $inputsHtml = '';
+
+        foreach ($fields as $name => $value) {
+            $inputsHtml .= sprintf(
+                '<input type="hidden" name="%s" value="%s">',
+                htmlspecialchars($name, ENT_QUOTES),
+                htmlspecialchars($value, ENT_QUOTES),
+            );
+        }
+
+        $formHtml = sprintf(
+            '<form id="js-test-post-form" method="post" action="%s">%s</form>',
+            htmlspecialchars($actionUrl, ENT_QUOTES),
+            $inputsHtml,
+        );
+
+        $this->executeJS(sprintf(
+            'document.body.insertAdjacentHTML("beforeend", %s); document.getElementById("js-test-post-form").submit();',
+            json_encode($formHtml),
+        ));
+    }
 }
