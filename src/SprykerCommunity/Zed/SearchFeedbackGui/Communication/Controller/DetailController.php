@@ -18,6 +18,7 @@ use SprykerCommunity\Zed\SearchFeedbackGui\Communication\Form\ReplyForm;
 use SprykerCommunity\Zed\SearchFeedbackGui\Communication\Table\TicketTable;
 use Symfony\Component\HttpFoundation\RedirectResponse;
 use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\Security\Csrf\CsrfToken;
 
 /**
  * @method \SprykerCommunity\Zed\SearchFeedbackGui\Communication\SearchFeedbackGuiCommunicationFactory getFactory()
@@ -28,6 +29,16 @@ class DetailController extends AbstractController
      * @var string
      */
     protected const URL_TICKET_LIST = '/search-feedback-gui';
+
+    /**
+     * changeStatusAction() is a plain POST endpoint, not a Symfony Form, so it carries none of the CSRF
+     * protection a Form-backed POST (e.g. ReplyForm, just below on the same page) gets automatically —
+     * same manual-CSRF-token posture as the Yves widget's own `SubmitTicketController`, and the exact
+     * `form.csrf_provider` mechanism Spryker core's own CommentGui module uses for its non-Form actions.
+     *
+     * @var string
+     */
+    protected const CSRF_TOKEN_ID_CHANGE_STATUS = 'search-feedback-gui-change-status';
 
     /**
      * Both the "ticket worker" and "feedback admin" Zed ACL groups can reach this action and post a reply
@@ -101,6 +112,7 @@ class DetailController extends AbstractController
             'replyForm' => $replyForm->createView(),
             'statuses' => (new SearchFeedbackConfig())->getStatuses(),
             'searchResultsPageUrl' => $this->buildSearchResultsPageUrl($ticketTransfer),
+            'changeStatusCsrfToken' => $this->getFactory()->getCsrfTokenManager()->getToken(static::CSRF_TOKEN_ID_CHANGE_STATUS)->getValue(),
         ]);
     }
 
@@ -183,6 +195,13 @@ class DetailController extends AbstractController
      * Its own action (not folded into indexAction()) so a "feedback admin" Zed ACL group can be granted
      * this module's view+reply actions while having this one specifically denied — see the package README.
      *
+     * POST-only, CSRF-token-checked: this used to be a plain GET link, which let any page a logged-in Zed
+     * user's browser loaded (an `<img>` tag, a crafted link) silently change a ticket's status by riding
+     * their session cookie — no confirmation, no token, nothing Zed-side to distinguish that from a real
+     * click. Now submitted as a real form POST (see `Detail/index.twig`) carrying a
+     * `form.csrf_provider`-issued token, the same mechanism `ReplyForm` already gets automatically as a
+     * Symfony Form and Spryker core's own CommentGui module uses for its own non-Form POST actions.
+     *
      * Unlike indexAction(), this action never loads the ticket first — a stale bookmark or a hand-edited
      * URL can reach here with an id that no longer exists, so changeTicketStatus()'s
      * `OutOfBoundsException` is a real, reachable case here (not just a defensive check), caught and
@@ -193,9 +212,15 @@ class DetailController extends AbstractController
     public function changeStatusAction(Request $request): RedirectResponse
     {
         $idSearchFeedbackTicket = $this->castId(
-            $request->query->get(TicketTable::URL_PARAM_ID_SEARCH_FEEDBACK_TICKET),
+            $request->request->get(TicketTable::URL_PARAM_ID_SEARCH_FEEDBACK_TICKET),
         );
-        $status = (string)$request->query->get('status', '');
+        $status = (string)$request->request->get('status', '');
+
+        if (!$this->isChangeStatusCsrfTokenValid($request)) {
+            $this->addErrorMessage('Your session has expired, please try again.');
+
+            return $this->redirectResponse(sprintf('/search-feedback-gui/detail?%s=%d', TicketTable::URL_PARAM_ID_SEARCH_FEEDBACK_TICKET, $idSearchFeedbackTicket));
+        }
 
         if (!in_array($status, (new SearchFeedbackConfig())->getStatuses(), true)) {
             $this->addErrorMessage('Unknown ticket status.');
@@ -214,5 +239,17 @@ class DetailController extends AbstractController
         $this->addSuccessMessage('Ticket status updated.');
 
         return $this->redirectResponse(sprintf('/search-feedback-gui/detail?%s=%d', TicketTable::URL_PARAM_ID_SEARCH_FEEDBACK_TICKET, $idSearchFeedbackTicket));
+    }
+
+    /**
+     * @param \Symfony\Component\HttpFoundation\Request $request
+     */
+    protected function isChangeStatusCsrfTokenValid(Request $request): bool
+    {
+        $tokenValue = (string)$request->request->get('csrfToken', '');
+
+        return $this->getFactory()->getCsrfTokenManager()->isTokenValid(
+            new CsrfToken(static::CSRF_TOKEN_ID_CHANGE_STATUS, $tokenValue),
+        );
     }
 }
