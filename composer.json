@@ -50,7 +50,8 @@
         "squizlabs/php_codesniffer": "3.13.6"
     },
     "suggest": {
-        "spryker-community/search-ranking": "Lets a ticket's frozen SRP snapshot also carry the specificity-weighting result that scored it (TermVectorSnapshotProviderPluginInterface, implemented by search-ranking's SearchFeedbackTermVectorSnapshotProviderPlugin)."
+        "spryker-community/search-ranking": "Lets a ticket's frozen SRP snapshot also carry the specificity-weighting result that scored it (TermVectorSnapshotProviderPluginInterface, implemented by search-ranking's SearchFeedbackTermVectorSnapshotProviderPlugin).",
+        "spryker-community/search-debug": "The ticket 'View SRP' replay reuses the real search route (DetailController::buildSearchResultsPageUrl() -> Config::getSearchPath()), which is exactly where search-debug's overlay activates -- no integration code needed, but without it a replay only shows WHAT the customer saw, not WHY (matched tokens, business-signal contribution, BM25 explanation)."
     },
     "repositories": [
         {
