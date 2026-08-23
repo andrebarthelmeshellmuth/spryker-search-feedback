@@ -57,12 +57,24 @@ class TicketDetailPage
     public const FLASH_MESSAGE_TICKET_NOT_FOUND_FORMAT = 'Ticket with id %d does not exist.';
 
     /**
+     * @var string
+     */
+    public const CSRF_TOKEN_FIELD_XPATH = "//input[@name='csrfToken']";
+
+    /**
+     * changeStatusAction() is a CSRF-protected POST endpoint (see DetailController) — each status is its
+     * own small `<form>`/`<button>` now, not an `<a href>` link, so a real WebDriver click still performs
+     * a real POST with the server-rendered CSRF token already embedded.
+     *
      * @param string $status e.g. "answered", "closed", "open"
      *
-     * @return string XPath for that status's own "Mark <status>" link.
+     * @return string XPath for that status's own "Mark <status>" submit button.
      */
-    public static function markStatusLinkXpath(string $status): string
+    public static function markStatusButtonXpath(string $status): string
     {
-        return sprintf("//a[contains(@href, 'status=%s') and contains(., 'Mark')]", $status);
+        return sprintf(
+            "//form[.//input[@name='status' and @value='%s']]//button[contains(., 'Mark')]",
+            $status,
+        );
     }
 }

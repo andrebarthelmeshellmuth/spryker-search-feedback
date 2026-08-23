@@ -20,6 +20,7 @@ use SprykerCommunity\Zed\SearchFeedbackGui\Dependency\Facade\SearchFeedbackGuiTo
 use SprykerCommunity\Zed\SearchFeedbackGui\Dependency\Facade\SearchFeedbackGuiToUserFacadeInterface;
 use SprykerCommunity\Zed\SearchFeedbackGui\SearchFeedbackGuiDependencyProvider;
 use Symfony\Component\Form\FormInterface;
+use Symfony\Component\Security\Csrf\CsrfTokenManagerInterface;
 
 /**
  * @method \SprykerCommunity\Zed\SearchFeedbackGui\SearchFeedbackGuiConfig getConfig()
@@ -63,6 +64,16 @@ class SearchFeedbackGuiCommunicationFactory extends AbstractCommunicationFactory
     public function getLocaleFacade(): SearchFeedbackGuiToLocaleFacadeInterface
     {
         return $this->getProvidedDependency(SearchFeedbackGuiDependencyProvider::FACADE_LOCALE);
+    }
+
+    /**
+     * Same `form.csrf_provider` container service every Symfony Form in Zed already relies on for its own
+     * automatic CSRF protection (see ReplyForm) — used directly here for changeStatusAction(), which is a
+     * plain POST endpoint rather than a Symfony Form.
+     */
+    public function getCsrfTokenManager(): CsrfTokenManagerInterface
+    {
+        return $this->getProvidedDependency(SearchFeedbackGuiDependencyProvider::SERVICE_FORM_CSRF_PROVIDER);
     }
 
     /**

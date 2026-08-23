@@ -54,9 +54,14 @@
                             <div class="btn-group" style="margin-left: 10px;">
                                 {% for status in statuses %}
                                     {% if status != ticket.status %}
-                                        <a class="btn btn-default btn-sm" href="/search-feedback-gui/detail/change-status?id-search-feedback-ticket={{ ticket.idSearchFeedbackTicket }}&status={{ status }}">
-                                            {{ 'Mark %status%' | trans({'%status%': status}) }}
-                                        </a>
+                                        <form method="post" action="/search-feedback-gui/detail/change-status" style="display: inline;">
+                                            <input type="hidden" name="id-search-feedback-ticket" value="{{ ticket.idSearchFeedbackTicket }}">
+                                            <input type="hidden" name="status" value="{{ status }}">
+                                            <input type="hidden" name="csrfToken" value="{{ changeStatusCsrfToken }}">
+                                            <button type="submit" class="btn btn-default btn-sm">
+                                                {{ 'Mark %status%' | trans({'%status%': status}) }}
+                                            </button>
+                                        </form>
                                     {% endif %}
                                 {% endfor %}
                             </div>

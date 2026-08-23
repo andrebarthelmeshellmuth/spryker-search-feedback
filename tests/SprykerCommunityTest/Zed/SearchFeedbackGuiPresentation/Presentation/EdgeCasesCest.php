@@ -15,8 +15,11 @@ use SprykerCommunityTest\Zed\SearchFeedbackGuiPresentation\SearchFeedbackGuiPres
 
 /**
  * Checklist section 05 - EDGE CASES FIXED THIS PASS: crafted URLs should fail gracefully, not crash.
- * Uses a deliberately bogus ticket id (999999999) — always runs regardless of what data exists, unlike
- * most of this suite's other Cests.
+ * Uses a deliberately bogus ticket id (999999999). `nonexistentTicketIdOnDetailPageRedirectsToTheListNotACrash()`
+ * always runs regardless of what data exists; the other two need a real ticket to load first, purely to
+ * mint a valid CSRF token from its detail page's own rendered form (changeStatusAction() is a
+ * CSRF-protected POST endpoint — see DetailController) — skipped when none exists, same as most of this
+ * suite's other Cests.
  *
  * Auto-generated group annotations
  *
@@ -65,28 +68,48 @@ class EdgeCasesCest
         preg_match('/' . preg_quote(TicketDetailPage::URL_PARAM_ID, '/') . '=(\d+)/', (string)$viewHref, $matches);
         $idSearchFeedbackTicket = (int)$matches[1];
 
-        $i->amOnPage(sprintf(
-            '%s?%s=%d&status=bogus',
-            TicketDetailPage::URL_CHANGE_STATUS,
-            TicketDetailPage::URL_PARAM_ID,
-            $idSearchFeedbackTicket,
-        ));
+        // changeStatusAction() is a CSRF-protected POST endpoint (see DetailController) — "bogus" is not
+        // a real status any rendered button on the page ever submits, so this builds an equivalent POST
+        // via JS instead, carrying the real token this ticket's own detail page just rendered.
+        $csrfToken = (string)$i->grabAttributeFrom(TicketDetailPage::CSRF_TOKEN_FIELD_XPATH, 'value');
+        $i->submitFormViaJs(TicketDetailPage::URL_CHANGE_STATUS, [
+            TicketDetailPage::URL_PARAM_ID => (string)$idSearchFeedbackTicket,
+            'status' => 'bogus',
+            'csrfToken' => $csrfToken,
+        ]);
 
         $i->see(TicketDetailPage::FLASH_MESSAGE_UNKNOWN_STATUS);
         $i->seeInCurrentUrl(TicketDetailPage::URL);
     }
 
     /**
+     * Needs a REAL ticket to load first, purely to mint a valid CSRF token from its detail page's own
+     * rendered form (see DetailController::changeStatusAction()'s CSRF protection) — this test is no
+     * longer able to run with zero real tickets in the shop, unlike before that protection existed; skips
+     * exactly like this suite's other Cests already do in that case.
+     *
      * @param \SprykerCommunityTest\Zed\SearchFeedbackGuiPresentation\SearchFeedbackGuiPresentationTester $i
      */
     public function nonexistentTicketIdOnChangeStatusRedirectsToTheListNotACrash(SearchFeedbackGuiPresentationTester $i): void
     {
-        $i->amOnPage(sprintf(
-            '%s?%s=%d&status=closed',
-            TicketDetailPage::URL_CHANGE_STATUS,
-            TicketDetailPage::URL_PARAM_ID,
-            static::BOGUS_TICKET_ID,
-        ));
+        $i->amOnPage(TicketListPage::URL);
+        $i->waitForElementVisible(TicketListPage::SELECTOR_TABLE, 10);
+
+        if (!$i->tryToSeeElement(TicketListPage::SELECTOR_VIEW_BUTTON)) {
+            $i->comment('No ticket exists yet; skipping. Run the sibling Yves suite\'s TicketSubmissionCest first for full coverage.');
+
+            return;
+        }
+
+        $viewHref = $i->grabAttributeFrom(TicketListPage::SELECTOR_VIEW_BUTTON, 'href');
+        $i->amOnPage((string)$viewHref);
+
+        $csrfToken = (string)$i->grabAttributeFrom(TicketDetailPage::CSRF_TOKEN_FIELD_XPATH, 'value');
+        $i->submitFormViaJs(TicketDetailPage::URL_CHANGE_STATUS, [
+            TicketDetailPage::URL_PARAM_ID => (string)static::BOGUS_TICKET_ID,
+            'status' => 'closed',
+            'csrfToken' => $csrfToken,
+        ]);
 
         $i->see(sprintf(TicketDetailPage::FLASH_MESSAGE_TICKET_NOT_FOUND_FORMAT, static::BOGUS_TICKET_ID));
         $i->seeInCurrentUrl(TicketListPage::URL);
