@@ -1,0 +1,38 @@
+post:
+    topic:
+        - NotBlank: ~
+        - Length:
+              max: 255
+
+    body:
+        - NotBlank: ~
+        - Length:
+              max: 5000
+
+    searchTerm:
+        - Optional:
+              constraints:
+                  - Length:
+                        max: 255
+
+    pageNumber:
+        - Optional:
+              constraints:
+                  - Type:
+                        type: integer
+
+    filters:
+        - Optional:
+              constraints:
+                  - Type:
+                        type: array
+
+    skuList:
+        - Optional:
+              constraints:
+                  - Type:
+                        type: array
+                  - All:
+                        constraints:
+                            - Type:
+                                  type: string

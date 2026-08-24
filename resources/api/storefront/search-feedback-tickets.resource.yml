@@ -1,0 +1,108 @@
+resource:
+    name: SearchFeedbackTickets
+    shortName: search-feedback-tickets
+    description: 'SRP feedback tickets: a free-text ticket filed by an authorized storefront customer about the search results page they are currently looking at (query, active filters, page, SKUs shown).'
+
+    provider: SprykerCommunity\Glue\SearchFeedbackRestApi\Api\Storefront\Provider\SearchFeedbackTicketsStorefrontProvider
+    processor: SprykerCommunity\Glue\SearchFeedbackRestApi\Api\Storefront\Processor\SearchFeedbackTicketsStorefrontProcessor
+
+    securityBearerAuthRequired: true
+
+    operations:
+        - type: Post
+          description: 'File a new SRP feedback ticket for the authenticated customer'
+          security: "is_granted('ROLE_CUSTOMER')"
+          uriTemplate: '/search-feedback-tickets'
+          openapiContext:
+              summary: 'Submit a search feedback ticket'
+              description: 'Files a new ticket about the search results page the authenticated customer is currently looking at. Real authorization (does this customer hold the feedback-admin permission) is re-checked server-side in Zed; a rejection here still comes back as a 422 with a descriptive error rather than a generic 403, matching the isSuccess=false/errorMessage contract the underlying SearchFeedbackClient::submitTicket() already uses.'
+              responses:
+                  201:
+                      description: 'Ticket created.'
+                  401:
+                      description: 'Missing or invalid access token.'
+                  422:
+                      description: 'Validation failed, or the customer is not authorized to submit search feedback tickets.'
+
+    properties:
+        id:
+            type: string
+            identifier: true
+            writable: false
+            readable: true
+            required: false
+            description: 'Unique identifier of the created ticket'
+            openapiContext:
+                example: '42'
+
+        topic:
+            type: string
+            writable: true
+            readable: true
+            required: true
+            description: 'Short subject line for the ticket'
+            openapiContext:
+                example: 'Irrelevant results for "garden chair"'
+
+        body:
+            type: string
+            writable: true
+            readable: true
+            required: true
+            description: 'The customer''s message describing the problem'
+            openapiContext:
+                example: 'The first three results are patio umbrellas, not chairs.'
+
+        searchTerm:
+            type: string
+            writable: true
+            readable: true
+            required: false
+            description: 'The search term the ticket is filed against'
+            openapiContext:
+                example: 'garden chair'
+
+        filters:
+            type: array
+            writable: true
+            readable: true
+            required: false
+            description: 'The active facet/filter state of the search results page the ticket was filed from, as a plain map of parameter name to value(s)'
+            openapiContext:
+                example: { category: ['123'], brand: ['456'] }
+
+        pageNumber:
+            type: integer
+            writable: true
+            readable: true
+            required: false
+            description: 'The result page number the ticket was filed from'
+            openapiContext:
+                example: 1
+
+        skuList:
+            type: array
+            writable: true
+            readable: true
+            required: false
+            description: 'Every product SKU rendered on the results page the ticket was filed from'
+            openapiContext:
+                example: ['001_25904006', '001_25904007']
+
+        status:
+            type: string
+            writable: false
+            readable: true
+            required: false
+            description: 'Current ticket status (read-only, assigned server-side)'
+            openapiContext:
+                example: 'open'
+
+        createdAt:
+            type: string
+            writable: false
+            readable: true
+            required: false
+            description: 'Timestamp when the ticket was created'
+            openapiContext:
+                example: '2026-08-24T10:00:00+00:00'

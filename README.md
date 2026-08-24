@@ -406,6 +406,62 @@ full conversation thread + reply form + status actions):
       explanation with the exact remedy (grant the permission, per step 4) at HTTP 403, rather than a bare
       access-denied response.
 
+## Glue API
+
+`spryker-community/search-feedback` exposes one `api-platform`-era storefront REST resource,
+`search-feedback-tickets` — a POST-only endpoint for filing a new SRP feedback ticket. This project's
+Glue layer runs on `spryker/api-platform` (schema-driven: `resources/api/storefront/*.resource.yml` +
+`.validation.yml`, autowired `Provider`/`Processor` classes, generated `#[ApiResource]` PHP), not the
+legacy `ResourceRoutePluginInterface`/`@Glue(...)` convention. Nothing beyond declaring the schema is
+needed in a host shop — it is discovered automatically as long as the shop's
+`config/Glue/packages/spryker_api_platform.php` includes `vendor/spryker-community` in
+`sourceDirectories()` (already the case for any shop that installs community packages under that vendor
+namespace).
+
+**If your shop installs `spryker-community/*` packages via composer path repositories** (symlinked into
+`vendor/spryker-community/*`, rather than a real `composer require` install): a plain `sourceDirectories`
+entry is not actually sufficient on its own — `spryker/api-platform`'s schema finder does not follow
+symlinked directories, so this package's schema is silently invisible to `api:generate` despite the
+correct config. See
+[spryker-community/search-debug's own README](https://github.com/spryker-shop/search-debug#glue-api),
+"Glue API" section, for the fix (a small `SchemaFinder`/`ValidationSchemaFinder` override).
+
+### `POST /search-feedback-tickets`
+
+Requires a bearer token for an authenticated customer (`securityBearerAuthRequired: true`,
+`security: "is_granted('ROLE_CUSTOMER')"`). `customerReference`/`storeName`/`localeName` are always
+resolved server-side from the authenticated session/store context — never taken from the request body.
+
+Real authorization (`SubmitSearchFeedbackTicketPermissionPlugin`) is re-checked, and enforced, entirely
+server-side in Zed's `GatewayController` — exactly the same posture the Yves `SubmitTicketController`
+already relies on. The Glue processor performs the *same* permission check inline via
+`PermissionClientInterface::can()` before calling the Client, purely as a UX-level fast-fail (a 422 with
+a specific message beats a round-trip that Zed would reject anyway); it is not a security boundary and
+cannot be trusted as one.
+
+Request body (JSON:API `attributes`):
+
+| Field        | Type    | Required | Notes                                                  |
+|--------------|---------|----------|---------------------------------------------------------|
+| `topic`      | string  | yes      | Short subject line.                                     |
+| `body`       | string  | yes      | The customer's message.                                 |
+| `searchTerm` | string  | no       | The search term the ticket is filed against.             |
+| `filters`    | array   | no       | Active facet/filter state, e.g. `{"category": ["123"]}`. |
+| `pageNumber` | integer | no       | Result page the ticket was filed from.                  |
+| `skuList`    | array   | no       | SKUs shown on that page.                                 |
+
+Response, on success (`201`): the same fields echoed back, plus `id` (the created ticket's id, as a
+string), `status`, and `createdAt`. `body` is echoed from the request — `SearchFeedbackTicketTransfer`
+has no top-level `body` field; the persisted message text lives at `messages[0].body` in the ticket's
+thread, which this endpoint does not otherwise expose.
+
+Errors: `422` on validation failure, on "not logged in," on "not authorized," or on any
+`isSuccess: false` response from `SearchFeedbackClient::submitTicket()` (its `errorMessage` becomes the
+JSON:API error detail).
+
+After changing either `.resource.yml` file, regenerate with `vendor/bin/glue api:generate` from the
+host shop root.
+
 ## Limitations
 
 - **No notification when a ticket is answered.** There is no email/mail integration anywhere in this
