@@ -14,7 +14,6 @@
         "php": ">=8.3",
         "spryker/acl": "^3.27.0",
         "spryker/api-platform": "^1.22.0",
-        "spryker/catalog": "^5.7.0",
         "spryker/customer": "^7.0.0 || ^8.0.0",
         "spryker/company-user": "^2.0.0",
         "spryker/event-dispatcher": "^1.0.0",
@@ -37,20 +36,24 @@
         "symfony/form": "^6.0.0 || ^7.0.0",
         "symfony/http-foundation": "^6.0.0 || ^7.0.0",
         "symfony/security-csrf": "^6.0.0 || ^7.0.0",
-        "symfony/security-guard": "5.4.0-BETA1"
+        "symfony/security-guard": "5.4.0-BETA1",
+        "ruflin/elastica": "^7.3.0"
     },
     "require-dev": {
+        "api-platform/metadata": "^4.3.0",
         "codeception/codeception": "^5.0.0",
         "codeception/module-asserts": "^3.0.0",
         "dealerdirect/phpcodesniffer-composer-installer": "^1.0.0",
         "phpmd/phpmd": "^2.15.0",
         "phpstan/phpstan": "^2.0.0",
         "phpunit/phpunit": "^10.0.0 || ^11.0.0",
+        "psr/log": "^3.0.0",
         "rector/rector": "^2.0",
         "slevomat/coding-standard": "8.22.1",
         "spryker-community/search-ranking": "^2.2",
         "spryker/code-sniffer": "0.17.35",
-        "squizlabs/php_codesniffer": "3.13.6"
+        "squizlabs/php_codesniffer": "3.13.6",
+        "symfony-cmf/routing": "^3.0.0"
     },
     "suggest": {
         "spryker-community/search-ranking": "Lets a ticket's frozen SRP snapshot also carry the specificity-weighting result that scored it (TermVectorSnapshotProviderPluginInterface, implemented by search-ranking's SearchFeedbackTermVectorSnapshotProviderPlugin).",
