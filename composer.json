@@ -27,6 +27,7 @@
         "spryker/propel-orm": "^1.24.0",
         "spryker/search-elasticsearch": "^1.10.0",
         "spryker/search-extension": "^1.2.0",
+        "spryker/serializer": "^1.0.0",
         "spryker/session": "^4.0.0",
         "spryker/store": "^1.0.0",
         "spryker/transfer": "^3.25.0",
@@ -35,7 +36,8 @@
         "symfony/console": "^6.0.0 || ^7.0.0",
         "symfony/form": "^6.0.0 || ^7.0.0",
         "symfony/http-foundation": "^6.0.0 || ^7.0.0",
-        "symfony/security-csrf": "^6.0.0 || ^7.0.0"
+        "symfony/security-csrf": "^6.0.0 || ^7.0.0",
+        "symfony/security-guard": "5.4.0-BETA1"
     },
     "require-dev": {
         "codeception/codeception": "^5.0.0",
