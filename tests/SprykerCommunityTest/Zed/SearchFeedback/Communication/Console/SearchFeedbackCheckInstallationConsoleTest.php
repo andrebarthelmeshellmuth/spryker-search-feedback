@@ -20,6 +20,7 @@ use SprykerCommunity\Shared\SearchFeedback\Plugin\ViewSearchFeedbackTicketReplay
 use SprykerCommunity\Zed\SearchFeedback\Business\SearchFeedbackFacade;
 use SprykerCommunity\Zed\SearchFeedback\Communication\Console\SearchFeedbackCheckInstallationConsole;
 use SprykerCommunity\Zed\SearchFeedback\Dependency\Facade\SearchFeedbackToPermissionFacadeInterface;
+use stdClass;
 use Symfony\Component\Console\Application;
 use Symfony\Component\Console\Tester\CommandTester;
 
@@ -228,6 +229,35 @@ class SearchFeedbackCheckInstallationConsoleTest extends Unit
         $this->assertStringContainsString('permission plugin(s) are synced into spy_permission', $commandTester->getDisplay());
     }
 
+    public function testWarnsAndNamesTheRemedyWhenTheGlueApiResourceIsNotGenerated(): void
+    {
+        // Arrange — a class name nothing ever defines, standing in for `vendor/bin/glue api:generate` never having run.
+        $commandTester = $this->createCommandTesterWithGlueApiResourceClassName('Generated\\Api\\Storefront\\DoesNotExistResource' . uniqid());
+
+        // Act
+        $exitCode = $commandTester->execute([]);
+
+        // Assert — optional (a project may not run Glue Storefront at all), so still CODE_SUCCESS.
+        $this->assertSame(SearchFeedbackCheckInstallationConsole::CODE_SUCCESS, $exitCode);
+        $this->assertStringContainsString('does not exist yet', $commandTester->getDisplay());
+        $this->assertStringContainsString('vendor/bin/glue api:generate storefront', $commandTester->getDisplay());
+        $this->assertStringNotContainsString('is generated', $commandTester->getDisplay());
+    }
+
+    public function testSucceedsWithoutWarningWhenTheGlueApiResourceIsGenerated(): void
+    {
+        // Arrange — stdClass stands in for the real generated resource class; the check only calls class_exists().
+        $commandTester = $this->createCommandTesterWithGlueApiResourceClassName(stdClass::class);
+
+        // Act
+        $exitCode = $commandTester->execute([]);
+
+        // Assert
+        $this->assertSame(SearchFeedbackCheckInstallationConsole::CODE_SUCCESS, $exitCode);
+        $this->assertStringContainsString('Glue API resource ' . stdClass::class . ' is generated', $commandTester->getDisplay());
+        $this->assertStringNotContainsString('does not exist yet', $commandTester->getDisplay());
+    }
+
     public function testFailsAndNamesTheRemedyWhenTheTicketTableIsUnreachable(): void
     {
         // Arrange
@@ -371,6 +401,41 @@ class SearchFeedbackCheckInstallationConsoleTest extends Unit
             protected function readSnapshotColumnTypes(): array
             {
                 return $this->columnTypesByName;
+            }
+        };
+        $console->setFacade($facadeMock);
+
+        $application = new Application();
+        $application->add($console);
+
+        $command = $application->find(SearchFeedbackCheckInstallationConsole::COMMAND_NAME);
+
+        return new CommandTester($command);
+    }
+
+    /**
+     * A real ticket collection and application/command wiring, same as {@see createCommandTester()}, but
+     * with an anonymous subclass overriding
+     * {@see SearchFeedbackCheckInstallationConsole::getGlueApiResourceClassName()} so the Glue API wiring
+     * check tests `class_exists()` against a fixture class name instead of this host shop's real
+     * (generator-produced) `Generated\Api\Storefront\SearchFeedbackTicketsStorefrontResource`.
+     */
+    protected function createCommandTesterWithGlueApiResourceClassName(string $resourceClassName): CommandTester
+    {
+        $facadeMock = $this->getMockBuilder(SearchFeedbackFacade::class)
+            ->onlyMethods(['getTicketCollection'])
+            ->getMock();
+        $facadeMock->method('getTicketCollection')->willReturn($this->createTicketCollection(1));
+
+        $console = new class ($resourceClassName) extends SearchFeedbackCheckInstallationConsole {
+            public function __construct(protected string $resourceClassName)
+            {
+                parent::__construct();
+            }
+
+            protected function getGlueApiResourceClassName(): string
+            {
+                return $this->resourceClassName;
             }
         };
         $console->setFacade($facadeMock);

@@ -125,6 +125,16 @@ class SearchFeedbackCheckInstallationConsole extends Console
     ];
 
     /**
+     * This package ships its OWN Glue API Platform resource (unlike search-debug/search-ranking's
+     * additive merge into core's `catalog-search`), so there is no project-level provider override to
+     * check for — the only thing that can silently be missing is `vendor/bin/glue api:generate` never
+     * having been run since this schema was added.
+     *
+     * @var string
+     */
+    protected const GLUE_API_RESOURCE_CLASS_NAME = 'Generated\\Api\\Storefront\\SearchFeedbackTicketsStorefrontResource';
+
+    /**
      * The locale whose catalog defines the expected key set; the others are kept at parity with it.
      *
      * @var string
@@ -176,6 +186,7 @@ class SearchFeedbackCheckInstallationConsole extends Console
         $this->checkFrozenReplayWiring($output);
         $this->checkSnapshotColumnTypes($output);
         $this->checkPermissionsSynced($output);
+        $this->checkGlueApiWiring($output);
 
         $output->writeln('');
 
@@ -550,6 +561,44 @@ class SearchFeedbackCheckInstallationConsole extends Console
             'These permission plugins are registered in code but NOT synced into spy_permission yet: %s. Visit /permission/index/sync in Zed once (or click "Sync permissions" under Maintenance) — until then, granting them via the Company Role GUI is impossible, and that GUI\'s create/edit page throws a hard error for every company role, not just ones that would hold these permissions.',
             implode(', ', $unsyncedPermissionKeys),
         );
+    }
+
+    /**
+     * `spryker/api-platform` is a hard composer dependency here (unlike search-debug/search-ranking's own
+     * OPTIONAL Glue property, this package ships its own resource, so there is nothing to conditionally
+     * skip), but the generated `Generated\Api\Storefront\SearchFeedbackTicketsStorefrontResource` class
+     * only exists once `vendor/bin/glue api:generate storefront` has actually been run against this
+     * package's schema — a project that installs/updates this package but never (re-)runs that command
+     * gets no error at all, just a `catalog-search-tickets` resource missing from the OpenAPI docs and a
+     * 404 on `POST /search-feedback-tickets`. WARNING, not a failure: a project that does not run a Glue
+     * Storefront application at all is a legitimate, common configuration, not a broken install.
+     *
+     * @param \Symfony\Component\Console\Output\OutputInterface $output
+     */
+    protected function checkGlueApiWiring(OutputInterface $output): void
+    {
+        $resourceClassName = $this->getGlueApiResourceClassName();
+
+        if (class_exists($resourceClassName)) {
+            $output->writeln(sprintf('<info>✓</info> Glue API resource %s is generated', $resourceClassName));
+
+            return;
+        }
+
+        $this->warnings[] = sprintf(
+            'Glue API resource %s does not exist yet: run `vendor/bin/glue api:generate storefront` (see README, "Glue REST API"). POST /search-feedback-tickets will 404 until then. Skip this if your project does not run a Glue Storefront application.',
+            $resourceClassName,
+        );
+    }
+
+    /**
+     * Isolated as its own method so a test can override it to point at a fixture class name instead of
+     * this host shop's real generated Glue resource — same seam-for-testability reasoning as
+     * {@see getSearchElasticsearchFactoryOverrideFilePath()}.
+     */
+    protected function getGlueApiResourceClassName(): string
+    {
+        return static::GLUE_API_RESOURCE_CLASS_NAME;
     }
 
     /**
