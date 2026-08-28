@@ -107,6 +107,15 @@ full conversation thread + reply form + status actions):
   `search-ranking-optimizer` package's own rating-permission check). A B2C-only shop with no
   `CompanyUser` module has nothing to grant the permission to.
 
+### Search engine compatibility
+
+Verified on **OpenSearch 1.3.4, 2.11, 3.5.0 and Elasticsearch 8.11**. This package issues no live query
+and reads no engine-version-specific response shape — it only reconstructs a previously-captured
+`Elastica\Response` from stored data — so the engine version is not load-bearing here. The OpenSearch 3.5
+upgrade needed **no code change** in this package; see
+[Migrating to OpenSearch 3.x](docs/opensearch-3.x-migration.md) for why the frozen-replay reconstruction is
+engine-version-agnostic, plus the one upgrade-time schema trap every Spryker shop hits.
+
 ## Installation
 
 1. Not yet published on Packagist under the `spryker-community` vendor namespace. That namespace and its
