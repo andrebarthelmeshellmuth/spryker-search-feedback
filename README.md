@@ -113,8 +113,8 @@ Verified on **OpenSearch 1.3.4, 2.11, 3.5.0 and Elasticsearch 8.11**. This packa
 and reads no engine-version-specific response shape — it only reconstructs a previously-captured
 `Elastica\Response` from stored data — so the engine version is not load-bearing here. The OpenSearch 3.5
 upgrade needed **no code change** in this package; see
-[Migrating to OpenSearch 3.x](https://github.com/andrebarthelmeshellmuth/spryker-search-ranking/blob/main/docs/opensearch-3.x-migration.md)
-(in `spryker-community/search-ranking`) for the core- and project-level steps the upgrade itself involves.
+[Migrating to OpenSearch 3.x](docs/opensearch-3.x-migration.md) for why the frozen-replay reconstruction is
+engine-version-agnostic, plus the one upgrade-time schema trap every Spryker shop hits.
 
 ## Installation
 
